@@ -13,19 +13,19 @@ Built for Loma Linda University School of Medicine, Advanced Integration Week 20
 
 ### The easiest way: one file, nothing else
 
-Download **[`TrailScript-standalone.html`](../../raw/main/TrailScript-standalone.html)**.
+Go to the [**Releases**](../../releases/latest) page and download **`TrailScript-standalone.html`**.
 
 Double-click it. That's it. Everything is inside that one file - the 42,555 US ZIP codes, the offline
 site copy, the QR code generator. It works with no install, no server, and no other files beside it.
 
 ### The bundles
 
-In the **[`downloads/`](downloads)** folder, each a single zip you unzip and open:
+Also on the [Releases](../../releases/latest) page, each a single zip you unzip and open:
 
 | Download | What it is | Open which file |
 |---|---|---|
-| [`TrailScript-v1.0-clinician-tool.zip`](../../raw/main/downloads/TrailScript-v1.0-clinician-tool.zip) | The everyday tool. What a clinician uses. | `index.html` |
-| [`TrailScript-v1.0-epic-smart-app.zip`](../../raw/main/downloads/TrailScript-v1.0-epic-smart-app.zip) | The version that launches inside an EHR. For whoever registers the app. | `launch.html` |
+| `TrailScript-clinician-tool.zip` | The everyday tool. What a clinician uses. | `index.html` |
+| `TrailScript-epic-smart-app.zip` | The version that launches inside an EHR. For whoever registers the app. | `launch.html` |
 
 ### If you want the whole repository
 
