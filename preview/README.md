@@ -7,6 +7,7 @@ be opened and argued with from any machine.
 | File | What it is for |
 |---|---|
 | `clinic-strip.html` | The layout chosen from four candidates: a short fixed map above a dense list, with a pinned Done bar. Also the first working demonstration of the multi-endpoint failover for live map data. |
+| `alltrails-options.html` | Four routes for bringing AllTrails data in, each tested against the live site rather than assumed. Carries the evidence for why two of them are dead. |
 
 `clinic-strip.html` tries `overpass-api.de` **first and on purpose**, because that
 host is unreachable from the network this project is developed on. Watching it

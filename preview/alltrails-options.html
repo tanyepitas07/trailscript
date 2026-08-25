@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AllTrails integration — four routes</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --ink:#16211c;--dim:#5b6b63;--faint:#8b9a92;--line:#dbe3de;--bg:#f7f9f8;--card:#fff;--panel:#f2f6f3;
+  --acc:#1f6b4a;--acc-soft:#e6f0ea;--acc-line:#a9cbba;
+  --warn:#8a5a12;--warn-soft:#fdf6ec;--warn-line:#e6d3ad;
+  --bad:#a13226;--bad-soft:#fbecea;--bad-line:#e3bdb7;
+  --at:#428813;--at-soft:#eef7e6;
+  --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --shadow:0 1px 2px rgba(22,33,28,.05),0 10px 30px -20px rgba(22,33,28,.45);
+}
+@media (prefers-color-scheme:dark){:root{
+  --ink:#e6ece8;--dim:#9db0a6;--faint:#74867c;--line:#2b3833;--bg:#121816;--card:#1a221f;--panel:#171f1c;
+  --acc:#5fbf8f;--acc-soft:#172e24;--acc-line:#2f5b46;--warn:#d8a75a;--warn-soft:#2a2115;--warn-line:#4a3a1c;
+  --bad:#e08376;--bad-soft:#2c1917;--bad-line:#4d2b26;--at:#8ed14f;--at-soft:#1d2a12;}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:900px;margin:0 auto;padding:0 22px 90px}
+header{padding:44px 0 6px}
+h1{font-size:29px;line-height:1.12;letter-spacing:-.02em;margin:0 0 10px}
+.lede{color:var(--dim);margin:0;max-width:66ch}
+h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);margin:44px 0 6px;font-weight:700}
+h2+.sub{color:var(--faint);font-size:13.5px;margin:0 0 16px;max-width:68ch}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card);
+  border:1px solid var(--line);border-radius:11px;overflow:hidden}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--panel);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+tr:last-child td{border-bottom:0}
+code{font-family:var(--mono);font-size:12.5px;background:var(--panel);padding:1px 5px;border-radius:4px}
+.yes{color:var(--acc);font-weight:650}
+.no{color:var(--bad);font-weight:650}
+
+.opt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:19px 21px;margin:14px 0;
+  box-shadow:var(--shadow)}
+.opt.pick{border-color:var(--acc);border-width:2px}
+.opt .hd{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px}
+.opt .hd h3{margin:0;font-size:18px;letter-spacing:-.01em}
+.tag{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;
+  border-radius:20px;white-space:nowrap}
+.tag.go{background:var(--acc-soft);color:var(--acc);border:1px solid var(--acc-line)}
+.tag.stop{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad-line)}
+.tag.ask{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+.opt p{margin:8px 0}
+.opt .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px;margin-top:13px}
+.fact{background:var(--panel);border-radius:9px;padding:9px 12px;font-size:13px}
+.fact b{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:2px}
+
+.demo{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:19px 21px;margin:14px 0;
+  box-shadow:var(--shadow)}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+@media (max-width:760px){.cards{grid-template-columns:1fr}}
+.col h4{margin:0 0 8px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.site{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--bg);margin-bottom:9px}
+.site .nm{font-weight:650}
+.site .sub{font-size:12.5px;color:var(--dim);margin-top:1px}
+.site .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.chip{font-size:10.5px;padding:2px 8px;border-radius:20px;background:var(--panel);border:1px solid var(--line);color:var(--dim)}
+.chip.miss{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.chip.at{background:var(--at-soft);border-color:var(--at);color:var(--at);font-weight:650}
+.src{font-size:10.5px;color:var(--faint);margin-top:7px;font-style:italic}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:12px 14px;overflow-x:auto;
+  font-family:var(--mono);font-size:11.5px;line-height:1.5;margin:10px 0}
+.callout{background:var(--warn-soft);border:1px solid var(--warn-line);border-radius:11px;padding:13px 16px;
+  margin:16px 0;font-size:14px}
+.callout b{display:block;margin-bottom:3px;color:var(--warn)}
+.callout.good{background:var(--acc-soft);border-color:var(--acc-line)}
+.callout.good b{color:var(--acc)}
+button{font:inherit;font-weight:650;font-size:13.5px;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;
+  background:var(--acc);color:#fff}
+button:hover{filter:brightness(1.08)}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:550}
+.blm{display:inline-block;background:var(--at);color:#fff;font-weight:700;font-size:13px;
+  padding:8px 15px;border-radius:9px;text-decoration:none;cursor:grab}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Bringing AllTrails into TrailScript</h1>
+  <p class="lede">Four routes, tested rather than assumed, on 25 August 2026. Permission from AllTrails is
+  in hand — so what follows is only about mechanism, not about whether we may.</p>
+</header>
+
+<h2>What I actually tested</h2>
+<p class="sub">Run from your browser, against the live site. The first two results look identical and
+mean completely different things.</p>
+
+<table>
+  <tr><th>Test</th><th>Result</th><th>What it means</th></tr>
+  <tr>
+    <td><b>Read AllTrails data from a TrailScript page</b><br><code>fetch()</code> across origins</td>
+    <td class="no">Blocked</td>
+    <td>The browser refuses to let one site read another's content unless the second site sends a header
+        allowing it. AllTrails doesn't. <b>This is a browser rule, and written permission does not reach it.</b></td>
+  </tr>
+  <tr>
+    <td><b>Is their server even reachable?</b><br><code>no-cors</code> probe</td>
+    <td class="yes">Reachable</td>
+    <td>The connection completes. So the block above is policy, not network — which is what makes the other
+        routes possible. <i>The identical failure on the map service was the opposite: unreachable.</i></td>
+  </tr>
+  <tr>
+    <td><b>Embed AllTrails in a panel</b><br><code>&lt;iframe&gt;</code></td>
+    <td class="no">Dead end</td>
+    <td>No header blocks framing, so the frame loads — and shows <b>"Verifying the device…"</b>, their bot
+        challenge, instead of trails. Getting past that is off-limits and would risk your access.</td>
+  </tr>
+  <tr>
+    <td><b>Open AllTrails in a normal tab</b></td>
+    <td class="yes">Works perfectly</td>
+    <td>No challenge, full content, and the page publishes <b>nine blocks of schema.org structured data</b> —
+        the machine-readable summary AllTrails puts there on purpose.</td>
+  </tr>
+</table>
+
+<div class="callout"><b>The one sentence that decides the architecture</b>
+Anything running <i>inside a real person's browsing session</i> works. Anything running <i>from the TrailScript
+page on its own</i> does not. Every viable route below is a variation on the first.</div>
+
+<h2>The four routes</h2>
+
+<div class="opt">
+  <div class="hd"><h3>A · Deep link</h3><span class="tag ask">Ships today</span></div>
+  <p>What the tool does now: a link that opens an AllTrails search for the site's name. The clinician leaves,
+  looks, and comes back with whatever is in their head.</p>
+  <div class="grid">
+    <div class="fact"><b>Effort</b>Already built</div>
+    <div class="fact"><b>Data returned</b>None</div>
+    <div class="fact"><b>Risk</b>None</div>
+  </div>
+</div>
+
+<div class="opt">
+  <div class="hd"><h3>B · Side-by-side with an import form</h3><span class="tag go">Works today</span></div>
+  <p>AllTrails opens in a real window. Beside it, TrailScript shows a short form — name, length, difficulty,
+  rating. The clinician copies across what matters and it lands in the summary attributed as entered by them.</p>
+  <div class="grid">
+    <div class="fact"><b>Effort</b>Half a day</div>
+    <div class="fact"><b>Data returned</b>Whatever is typed</div>
+    <div class="fact"><b>Weakness</b>Manual, every visit</div>
+  </div>
+  <p class="src">Honest weakness: this is the version that fails your own test — the clinician is still doing
+  the comparing.</p>
+</div>
+
+<div class="opt pick">
+  <div class="hd"><h3>C · A one-click bookmarklet</h3><span class="tag go">Tested, works, recommended first</span></div>
+  <p>A small button the clinician drags to their bookmarks bar once. On any AllTrails page they click it, and it
+  reads what the page already publishes about itself and hands it straight back to TrailScript. It runs
+  <i>inside their own session</i>, so there is no cross-site restriction and no bot challenge — the browser
+  considers it the person's own script on the person's own page.</p>
+  <div class="grid">
+    <div class="fact"><b>Effort</b>A day</div>
+    <div class="fact"><b>Data returned</b>Name, difficulty, length, rating, review count, time estimate</div>
+    <div class="fact"><b>Clinician cost</b>One click</div>
+  </div>
+  <p class="src">I ran the extractor on the Loma Linda page this afternoon. The results are below — they are real.</p>
+</div>
+
+<div class="opt">
+  <div class="hd"><h3>D · A bundled regional dataset</h3><span class="tag ask">Needs one email</span></div>
+  <p>The version you actually described: TrailScript merges everything before the clinician sees it, with no
+  extra clicks. It needs AllTrails data held locally, the same way the offline OpenStreetMap copy already works.
+  Collecting that by automated browsing runs back into the bot challenge — so the route is to <b>ask them for a
+  data export or an API key.</b> You already have permission; this is the follow-up request that turns it into
+  something usable.</p>
+  <div class="grid">
+    <div class="fact"><b>Effort</b>Two days, after the data arrives</div>
+    <div class="fact"><b>Data returned</b>Everything, automatically</div>
+    <div class="fact"><b>Blocker</b>One email to whoever wrote your permission</div>
+  </div>
+</div>
+
+<div class="opt">
+  <div class="hd"><h3>E · Embedded panel inside TrailScript</h3><span class="tag stop">Ruled out</span></div>
+  <p>Tested and dead: the frame loads and displays a device-verification screen. Working around that is not
+  something I will do, and for an academic project holding written permission it is also the fastest way to
+  lose it.</p>
+</div>
+
+<h2>Route C, demonstrated with real data</h2>
+<p class="sub">Everything in the right-hand column was read off AllTrails' Loma Linda page this afternoon.
+Nothing is invented.</p>
+
+<div class="demo">
+  <div class="cards">
+    <div class="col">
+      <h4>What OpenStreetMap gives us</h4>
+      <div class="site">
+        <div class="nm">Hulda Crooks Park</div>
+        <div class="sub">Park or green space · 1.1 miles</div>
+        <div class="chips"><span class="chip miss">Surface not recorded</span><span class="chip">Parking</span></div>
+        <div class="src">Live Overpass query, 25 Aug 2026</div>
+      </div>
+      <div class="site">
+        <div class="nm">Citrus Trails North</div>
+        <div class="sub">Park or green space · 1.3 miles</div>
+        <div class="chips"><span class="chip miss">Surface not recorded</span></div>
+        <div class="src">289 of 326 local sites have no surface tag</div>
+      </div>
+    </div>
+    <div class="col">
+      <h4>What one bookmarklet click adds</h4>
+      <div class="site" id="at1">
+        <div class="nm">Beaumont Ridge Trail Loop</div>
+        <div class="sub">2.5 mi · Est. 1–1.5 hr</div>
+        <div class="chips"><span class="chip at">Easy</span><span class="chip at">★ 4.7</span><span class="chip at">1,654 reviews</span></div>
+        <div class="src">AllTrails, retrieved 25 Aug 2026</div>
+      </div>
+      <div class="site">
+        <div class="nm">Razor Ridge to Jedi Trail to Beaumont Ridge Trail Loop</div>
+        <div class="sub">6.4 mi · Est. 3–3.5 hr</div>
+        <div class="chips"><span class="chip at">Moderate</span><span class="chip at">★ 4.6</span><span class="chip at">1,248 reviews</span></div>
+        <div class="src">AllTrails, retrieved 25 Aug 2026</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout good" style="margin-top:18px"><b>This is the argument for doing it at all</b>
+  Difficulty, a curated length, an honest time estimate, and 1,654 people's opinion. OpenStreetMap has none of
+  those for any site near you, and they are precisely the fields a clinician needs to match a place to a patient.</div>
+</div>
+
+<h2>Two problems route C does not solve</h2>
+<p class="sub">Worth deciding before I build it, not after.</p>
+
+<div class="opt">
+  <div class="hd"><h3>Matching names is genuinely hard</h3></div>
+  <p>OpenStreetMap calls it <code>Hulda Crooks Park</code>. AllTrails calls it
+  <code>Razor Ridge to Jedi Trail to Beaumont Ridge Trail Loop</code>. These are not the same object and often
+  never will be — AllTrails indexes <i>routes</i>, OpenStreetMap indexes <i>places</i>. Merging them by name
+  will produce confident wrong pairings.</p>
+  <p><b>My proposal:</b> don't merge. Show AllTrails routes as their own clearly-labelled section — additional
+  options, not enrichment of existing ones — and only attach AllTrails detail to an OSM site when the names match
+  exactly. Everything else stays separate and honest.</p>
+</div>
+
+<div class="opt">
+  <div class="hd"><h3>These are hill trails, and your patients are urban</h3></div>
+  <p>Every top AllTrails result near Loma Linda is a ridge climb of 2.5 to 6.4 miles. You told me this project
+  is urban and urban-adjacent, for patients going somewhere after work. <b>AllTrails' idea of a trail and your
+  idea of a prescription may not overlap much</b>, and its rankings will pull the tool toward exactly the places
+  you said patients won't drive to.</p>
+  <p><b>My proposal:</b> AllTrails data is shown, never used for ranking. Distance from the patient stays the
+  sort order.</p>
+</div>
+
+<h2>What I'd do</h2>
+<div class="callout good"><b>Build C, send the email for D.</b>
+The bookmarklet works today, costs the clinician one click, and needs nobody's approval. In parallel, one email
+asking for a data export or API key turns the permission you already hold into route D — the fully automatic
+version you asked for. If they say yes, C becomes the fallback rather than the plan.</div>
+
+</div>
+</body>
+</html>
