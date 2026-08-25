@@ -1,0 +1,95 @@
+name: Release
+
+# Runs on GitHub's own machines, which is the point: the environment that
+# authors this repo cannot reach uploads.github.com, so release assets have to
+# be attached from here rather than from a laptop.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create the release for (e.g. v1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The committed single-file build must match index.html
+        run: python3 tools/build-standalone.py --check
+
+      - name: Build the bundles
+        run: |
+          set -euo pipefail
+          mkdir -p dist/TrailScript
+          cp index.html zips.js trailscript-fallback.js qrcode.min.js README.md dist/TrailScript/
+          (cd dist && zip -qr ../TrailScript-clinician-tool.zip TrailScript)
+          cp launch.html fhir-client.min.js dist/TrailScript/
+          (cd dist && zip -qr ../TrailScript-epic-smart-app.zip TrailScript)
+          ls -la *.zip
+
+      - name: Every zip must contain what it claims to
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile, hashlib, sys
+          expect = {
+            'TrailScript-clinician-tool.zip':
+              ['index.html','zips.js','trailscript-fallback.js','qrcode.min.js','README.md'],
+            'TrailScript-epic-smart-app.zip':
+              ['index.html','zips.js','trailscript-fallback.js','qrcode.min.js','README.md',
+               'launch.html','fhir-client.min.js'],
+          }
+          bad = []
+          for name, files in expect.items():
+              with zipfile.ZipFile(name) as z:
+                  if z.testzip(): bad.append('%s: corrupt member' % name)
+                  got = sorted(n.split('/',1)[1] for n in z.namelist() if not n.endswith('/'))
+                  if got != sorted(files):
+                      bad.append('%s: contents %s != %s' % (name, got, sorted(files)))
+                  for f in files:
+                      a = hashlib.sha256(z.read('TrailScript/'+f)).hexdigest()
+                      b = hashlib.sha256(open(f,'rb').read()).hexdigest()
+                      if a != b: bad.append('%s: %s differs from the repo copy' % (name, f))
+              print('%-36s %d files verified by hash' % (name, len(files)))
+          if bad:
+              print('\n'.join('FAIL: '+x for x in bad)); sys.exit(1)
+          PY
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            TrailScript-standalone.html \
+            TrailScript-clinician-tool.zip \
+            TrailScript-epic-smart-app.zip \
+            --title "TrailScript $TAG" \
+            --notes-file .github/RELEASE_NOTES.md \
+            --repo "$GITHUB_REPOSITORY" || \
+          gh release upload "$TAG" \
+            TrailScript-standalone.html \
+            TrailScript-clinician-tool.zip \
+            TrailScript-epic-smart-app.zip \
+            --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Confirm the assets actually landed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          n=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[] | "  \(.name)  \(.size) bytes"'
+          echo "assets attached: $n"
+          test "$n" -eq 3 || { echo "FAIL: expected 3 assets, found $n"; exit 1; }
