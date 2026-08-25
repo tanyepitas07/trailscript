@@ -44,12 +44,12 @@
  * CLIENT_ID: the public SMART sandbox accepts any client id for a public client,
  * so the default below works today with no registration. Epic issues its own
  * non-production client id once a UserWeb account is approved; drop it in here or
- * set localStorage.trailscript_client_id and nothing else changes.
+ * pass it as ?client_id= on this page URL and nothing else changes.
  */
-var CLIENT_ID = (function(){
-  try { return localStorage.getItem('trailscript_client_id') || 'trailscript-nonprod'; }
-  catch(e){ return 'trailscript-nonprod'; }
-})();
+/* No browser storage anywhere in this project - the "no storage" claim has to
+   be true on every page, not just the main one. An Epic non-production client
+   id is supplied as a URL parameter instead, which the EHR carries through. */
+var CLIENT_ID = new URLSearchParams(location.search).get('client_id') || 'trailscript-nonprod';
 
 var params = new URLSearchParams(location.search);
 var iss = params.get('iss');
@@ -71,16 +71,9 @@ if (!iss) {
     + 'pick a patient, set the App Launch URL to <code>' + location.href.split('?')[0] + '</code>, and click Launch. '
     + 'The patient ZIP code is read from the chart and the search runs itself.</li>'
     + '</ol>'
-    + '<p style="margin-top:14px">Client ID in use: <code>' + CLIENT_ID + '</code></p>'
-    + '<input class="k" id="cid" placeholder="Paste an Epic non-production client ID here">'
-    + '<button class="btn" id="save">Save client ID</button>');
-  var s = document.getElementById('save');
-  if (s) s.addEventListener('click', function(){
-    var v = (document.getElementById('cid').value||'').trim();
-    if (!v) return;
-    try { localStorage.setItem('trailscript_client_id', v); alert('Saved. Relaunch from the EHR to use it.'); }
-    catch(e){ alert('This browser blocked local storage; edit CLIENT_ID in launch.html instead.'); }
-  });
+    + '<p style="margin-top:14px">Client ID in use: <code>' + CLIENT_ID + '</code>. '
+    + 'To use an Epic non-production client id, append <code>?client_id=YOUR-ID</code> to this page\'s URL '
+    + 'when registering the launch URL with the EHR. Nothing is stored in this browser.</p>');
 } else {
   FHIR.oauth2.authorize({
     clientId: CLIENT_ID,

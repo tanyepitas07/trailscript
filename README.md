@@ -55,7 +55,9 @@ The patient-facing result is identical either way.
 
 1. **Never state a fact the data does not contain.** Surface, lighting and wheelchair access are
    shown only where OpenStreetMap records them, and render as "not recorded" otherwise. The tool
-   reports its own data coverage on every search - typically 80-90% of sites have no surface tag.
+   reports its own data coverage on every search - of 305 sites within 10 miles of the ZIP 92354 centroid (captured 25 Aug 2026), 275 (90.2%) carry no
+surface tag and one records wheelchair access. The figure is radius-dependent - 90.0% at 5 mi,
+85.0% at 15 mi, 77.7% at 25 mi.
 2. **The clinician prescribes; the software does not.** Every clinical sentence is either a verbatim
    guideline quote shown with its citation, or is explicitly labelled as an unreviewed AI draft.
    There is nothing in between, and an automated test enforces the distinction.
@@ -70,14 +72,21 @@ The patient-facing result is identical either way.
 | Elevation | Open-Meteo elevation API (terrain model) | free tier, no key |
 | Air quality, temperature, UV | Open-Meteo | free tier, no key |
 | US ZIP centroids | `zipcodes` npm package, bundled | see package |
-| Trail detail links | AllTrails (deep links only) | used with permission for this academic project; no data scraped, stored or redistributed |
+| Trail name lookups | AllTrails search links | AllTrails publishes no developer API; none of its data is scraped, stored or redistributed. Written confirmation of the scope of their approval is still outstanding |
 
 ## Testing
 
 `test-planb.js` runs the real page in Chromium against live-captured fixtures.
-**66 assertions, all passing.** Four deliberately planted bugs - a drifted guideline quote, a removed
-draft banner, a broken ASCII filter, and a park allowed to claim a trail length - each caused
-failures, so the controls are known to work rather than merely present.
+**120 assertions, all passing** (22 for the Plan A build in `test-app.js`, 80 for this build in `test-planb.js`, 18 for the SMART on FHIR launch
+in `test-smart.js`). **Seven deliberately planted defects** - a drifted guideline quote, a
+removed draft banner, a broken ASCII filter, a park allowed to claim a trail length, and an
+unlabelled clinical directive emitted outside the draft banner - each caused failures, so the
+controls are known to work rather than merely present.
+
+The last of those is worth its own note. An earlier version of the suite checked the comorbidity
+data tables and passed while the shipped output printed unlabelled clinical directives on every
+search. The test now reads the emitted text and fails if any clinical phrase falls outside the
+quoted or drafted zones.
 
 ## Known limits
 

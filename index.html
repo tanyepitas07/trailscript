@@ -418,14 +418,14 @@ var COMORB = {
       "Stop and seek care for chest pressure or pain, unusual breathlessness, light-headedness, or an irregular heartbeat.",
       "Carry nitroglycerin if it has been prescribed, and walk with a companion or a charged phone.",
       "Start at a pace that still allows conversation, and lengthen the walk before increasing the pace.",
-      "Sites with parking close to the path and benches to rest on were prioritised for this reason."
+      "Sites with parking close to the path and benches to rest on were prioritized for this reason."
     ] },
 
   hf: { label:"Heart failure",
     preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["bench"]},
     quotes:["pag2018_chronic","pag2018_movemore"],
     draft:[
-      "Confirm the patient is euvolaemic and clinically stable before recommending a new outdoor routine.",
+      "Confirm the patient is euvolemic and clinically stable before recommending a new outdoor routine.",
       "Ask the patient to weigh daily and to report a rapid weight gain, increasing breathlessness, or new swelling rather than pushing through it.",
       "Short, flat, repeatable walks close to home beat one long walk. Sites were filtered to flat and short for this reason.",
       "Heat and humidity worsen symptoms; check the temperature panel above before recommending a midday walk."
@@ -436,14 +436,16 @@ var COMORB = {
     quotes:["ada2026_dpp150","ada2026_dpp44","ada2026_strength75"],
     draft:[
       "Check feet before and after walking, and make sure footwear fits - especially where there is any peripheral neuropathy.",
-      "If the patient takes insulin or a sulfonylurea, discuss hypoglycaemia risk and carrying a fast-acting carbohydrate.",
-      "Advise carrying water; sites with mapped drinking water were prioritised.",
+      "If the patient takes insulin or a sulfonylurea, discuss hypoglycemia risk and carrying a fast-acting carbohydrate.",
+      "Advise carrying water; sites with mapped drinking water were prioritized.",
       "Walking after meals is a practical way to fit activity in and may help post-meal glucose - worth raising if the patient is looking for a routine."
     ] },
 
   obesity: { label:"Obesity",
     preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["bench"]},
-    quotes:["ada2026_dpp150","pag2018_movemore"],
+    /* The ADA quote is scoped to adults at high risk of type 2 diabetes and is
+       deliberately NOT served here, where that is not established. */
+    quotes:["pag2018_adults","pag2018_movemore"],
     draft:[
       "Frame the first target as showing up, not as distance. Short and repeatable beats ambitious and abandoned.",
       "Flat, paved, shaded routes with somewhere to sit reduce the number of reasons not to go, and sites were filtered accordingly.",
@@ -934,7 +936,7 @@ function renderRow(r){
   if(r.fragments>1) tags.appendChild(el('span','t',r.fragments+' mapped segments'));
   mid.appendChild(tags);
   if(onAllTrails(r)){
-    var a=el('a','at','Look it up on AllTrails');
+    var a=el('a','at','Search AllTrails for this name');
     a.href=allTrailsUrl(r); a.target='_blank'; a.rel='noopener noreferrer';
     mid.appendChild(a);
   }
@@ -1053,9 +1055,29 @@ function epicHowTo(){
   ].join('\n');
 }
 
+/* Standing safety text. It is clinical, it is not quoted from a guideline,
+ * and an earlier version printed it outside the draft banner - which made
+ * the project's own rule ("every clinical sentence is quoted or labelled")
+ * false in the output of every single search while the whole suite passed,
+ * because the tests inspected the data tables rather than the emitted text.
+ * It now lives with the other drafted lines, and a test reads the output. */
+var STANDING_DRAFT = [
+  'Stop and seek care for chest pain, unusual shortness of breath, or dizziness.',
+  'If you are not sure this is safe for you, call the clinic before starting.'
+];
+function conditionsDraft(){
+  var out=[];
+  if(!S.env) return out;
+  if(S.env.tmax!=null && S.env.tmax>=95)
+    out.push('It reached ' + Math.round(S.env.tmax) + ' F here today. On days like this, walk early morning or after sunset.');
+  if(S.env.aqi!=null && S.env.aqi>100)
+    out.push('Air quality today is in the range that affects sensitive groups. An indoor option may be the better choice.');
+  return out;
+}
+
 function comorbBlock(key){
-  var c=COMORB[key]; if(!c) return {lines:[], hasDraft:false};
-  var L=[], hasDraft=false;
+  var c=COMORB[key] || {label:'General adult', quotes:[], draft:[]};
+  var L=[];
   if(c.quotes && c.quotes.length){
     L.push('WHAT THE GUIDELINES SAY');
     c.quotes.forEach(function(qid){
@@ -1064,19 +1086,33 @@ function comorbBlock(key){
       L.push('    -- '+g.cite);
       L.push('');
     });
+    /* Several conditions have only the general chronic-disease guidance behind
+       them. Citing it without saying so would make generic advice look
+       condition-specific, which is a quieter kind of overstatement than an
+       outright wrong quote and just as misleading. */
+    if(c.quotes.length===1 && c.quotes[0]==='pag2018_chronic'){
+      L.push('  NOTE: the guidance above is the general chronic-conditions');
+      L.push('  recommendation, not guidance specific to ' + c.label.toLowerCase() + '.');
+      L.push('  Condition-specific sources were not reviewed for this profile.');
+      L.push('');
+    }
   }
-  if(c.draft && c.draft.length){
-    hasDraft=true;
-    L.push('POINTS TO DISCUSS -- ' + c.label.toUpperCase());
-    L.push('  *** DRAFT. NOT YET REVIEWED BY A CLINICIAN. ***');
-    L.push('  The lines below were drafted by an AI assistant for clinician');
-    L.push('  review. They are not quoted from a guideline and must be read');
-    L.push('  and approved before any patient sees them.');
-    L.push('');
-    c.draft.forEach(function(d){ L.push('  - '+d); });
-    L.push('');
-  }
-  return {lines:L, hasDraft:hasDraft};
+  /* Everything clinical that is NOT a verbatim quote goes below this banner,
+     including the standing safety lines and any weather or air-quality advice. */
+  var drafted = (c.draft||[]).concat(conditionsDraft()).concat(STANDING_DRAFT);
+  L.push('POINTS TO DISCUSS -- DRAFTED, NOT YET REVIEWED BY A CLINICIAN');
+  L.push('  *** Everything below this line was drafted by an AI assistant for');
+  L.push('  *** clinician review. It is not quoted from a guideline. It must be');
+  L.push('  *** read and approved before any patient sees it.');
+  L.push('');
+  drafted.forEach(function(d){ L.push('  - '+d); });
+  /* An explicit terminator so the drafted zone has an end as well as a start.
+     Without it, a clinical line appended after this block sits outside the
+     banner and a test that only asks "is it after the banner?" waves it
+     through - which is exactly what happened the first time this was tried. */
+  L.push('  *** end of drafted content ***');
+  L.push('');
+  return {lines:L, hasDraft:true, draftedCount:drafted.length};
 }
 
 function buildAvsText(){
@@ -1114,12 +1150,12 @@ function buildAvsText(){
     if(S.env.tmax!=null) bits.push('high of '+Math.round(S.env.tmax)+' F today');
     if(S.env.uv!=null) bits.push('peak UV '+Math.round(S.env.uv));
     L.push('  '+bits.join('; ')+'.');
-    if(S.env.tmax!=null && S.env.tmax>=95) L.push('  On days like this, walk early morning or after sunset.');
-    if(S.env.aqi!=null && S.env.aqi>100) L.push('  Air quality is poor today. Consider an indoor option instead.');
     L.push('');
   }
 
-  if(cb.lines.length){ L.push('-----------------------------------------------------------'); L.push(''); L.push.apply(L,cb.lines); }
+  L.push('-----------------------------------------------------------');
+  L.push('');
+  L.push.apply(L,cb.lines);
 
   L.push('-----------------------------------------------------------');
   if(S.usingFallback && window.TS_FALLBACK){
@@ -1130,8 +1166,6 @@ function buildAvsText(){
   L.push('Trail and park locations from OpenStreetMap contributors (ODbL).');
   L.push('Elevation from a public terrain model; air quality and weather from');
   L.push('Open-Meteo. Conditions change - check before you go.');
-  L.push('Stop and seek care for chest pain, unusual shortness of breath, or');
-  L.push('dizziness.');
   return ascii(L.join('\n'));
 }
 
@@ -1144,10 +1178,8 @@ function renderOutput(){
   if(OUT_TAB==='avs'){
     text=buildAvsText();
     var key=$('#comorb').value, cb=comorbBlock(key);
-    note = cb.hasDraft
-      ? 'This block contains AI-drafted clinical talking points for ' + COMORB[key].label.toLowerCase()
-        + '. They are marked as unreviewed inside the text. Read them before this reaches a patient.'
-      : 'Plain ASCII, safe to paste into Epic. ' + P.length + ' site' + (P.length>1?'s':'') + ' included.';
+    note = 'Plain ASCII, safe to paste into Epic. ' + P.length + ' site' + (P.length>1?'s':'')
+      + ' included. ' + cb.draftedCount + ' AI-drafted clinical lines are inside, under a banner marking them unreviewed - read them before this reaches a patient.';
   } else if(OUT_TAB==='phrase'){
     text=ascii(smartPhraseTemplate());
     note='Paste this into a new SmartPhrase named WALKRX. The *** is an Epic wildcard - F2 jumps to it, and that is where the output above goes.';
@@ -1212,8 +1244,14 @@ function renderSheet(){
     if(g){ care.appendChild(document.createTextNode('"'+g.quote+'" — '+g.cite)); }
     paper.appendChild(care);
   }
+  var draft=el('div','care');
+  draft.style.background='#fdf3e2'; draft.style.borderColor='#e6d3ad';
+  draft.appendChild(el('b',null,'Drafted for clinician review — not yet approved'));
+  draft.appendChild(document.createTextNode(
+    ((c2&&c2.draft||[]).concat(conditionsDraft()).concat(STANDING_DRAFT)).join(' ')));
+  paper.appendChild(draft);
   var f=el('footer');
-  f.textContent='Locations from OpenStreetMap contributors (ODbL). Scan a code for driving directions. Surfaces shown only where the map data records them. Check conditions before you go, and stop if you have chest pain, unusual shortness of breath, or dizziness.';
+  f.textContent='Locations from OpenStreetMap contributors (ODbL). Scan a code for driving directions. Surfaces shown only where the map data records them. Check conditions before you go.';
   paper.appendChild(f);
 }
 
