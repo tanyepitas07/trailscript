@@ -337,6 +337,7 @@ input[type=text],input[type=search],select{background:var(--bg);border:1px solid
 </div>
 
 <script src="zips.js"></script>
+<script src="trailscript-fallback.js"></script>
 <script src="qrcode.min.js"></script>
 <script src="fhir-client.min.js"></script>
 <script>
@@ -567,15 +568,47 @@ var ELEV='https://api.open-meteo.com/v1/elevation';
 var AQ='https://air-quality-api.open-meteo.com/v1/air-quality';
 var WX='https://api.open-meteo.com/v1/forecast';
 
-function overpass(q){
+/* The public Overpass endpoint publishes "Rate limit: 2" - two concurrent
+ * queries per client. The first version of this app fired the places query
+ * and the amenity query in parallel, which consumed both slots and left
+ * nothing for the geometry lookup; the live site answered HTTP 504 on its
+ * first real search. So: one Overpass request at a time, queued, with
+ * backoff on the statuses that mean "slow down" rather than "no".
+ * Measured against api/status on 25 Aug 2026: 2 slots, 2 available. */
+var _opChain = Promise.resolve();
+var OP_RETRY_MS = [1500, 4000, 9000];
+
+function _opOnce(q){
   return fetch(OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:'data='+encodeURIComponent(q)}).then(function(r){
-      if(!r.ok) throw new Error('map service HTTP '+r.status);
-      return r.text();
-    }).then(function(txt){
-      if(txt.charAt(0)!=='{') throw new Error('the map service is rate-limiting right now');
-      return JSON.parse(txt);
+      return r.text().then(function(txt){
+        if(!r.ok){ var e=new Error('map service HTTP '+r.status); e.status=r.status; throw e; }
+        if(txt.charAt(0)!=='{'){ var e2=new Error('the map service is busy'); e2.status=429; throw e2; }
+        return JSON.parse(txt);
+      });
     });
+}
+function _opWithRetry(q, attempt){
+  attempt = attempt||0;
+  return _opOnce(q).catch(function(err){
+    var transient = !err.status || err.status===429 || err.status===504 || err.status===502 || err.status===503;
+    if(transient && attempt < OP_RETRY_MS.length){
+      if(typeof onOverpassRetry==='function') onOverpassRetry(attempt+1, OP_RETRY_MS[attempt]);
+      return new Promise(function(res){ setTimeout(res, OP_RETRY_MS[attempt]); })
+        .then(function(){ return _opWithRetry(q, attempt+1); });
+    }
+    throw err;
+  });
+}
+function overpass(q){
+  var run = _opChain.then(function(){ return _opWithRetry(q); },
+                          function(){ return _opWithRetry(q); });
+  _opChain = run.catch(function(){});   /* the queue survives a failure */
+  return run;
+}
+function onOverpassRetry(n, waitMs){
+  var b=document.querySelector('#search');
+  if(b && b.disabled) b.innerHTML='<span class="spin"></span>Map service busy - retry '+n+' in '+Math.round(waitMs/1000)+'s';
 }
 function placesQuery(c,radiusM){
   var R=Math.round(radiusM), wide=R>25000;
@@ -742,8 +775,55 @@ function aqiBand(v){
   return {t:'Very unhealthy', flag:true};
 }
 
+/* ---------- offline fallback ----------
+ * The public Overpass endpoint allows two concurrent queries and does go
+ * down: the first live search from the deployed site answered HTTP 504.
+ * A demo in front of judges cannot depend on a free community service
+ * being healthy at 9am on a Friday, so the tool ships with a copy of the
+ * region captured from that same API, and says so on screen and in the
+ * printed text whenever it uses it. Distances are still computed live
+ * from whatever location the clinician entered - only the site list is
+ * from the copy.
+ * Force it for a rehearsal with ?offline=1 */
+function fallbackAvailable(){ return !!(window.TS_FALLBACK && window.TS_FALLBACK.sites); }
+function fallbackRows(center){
+  var F=window.TS_FALLBACK, out=[];
+  for(var i=0;i<F.sites.length;i++){
+    var a=F.sites[i];
+    var rec={ id:a[14]+'/'+a[15], osmType:a[14], osmId:a[15], name:a[0], kind:a[1],
+      lat:a[2], lon:a[3], meters:haversine(center,{lat:a[2],lon:a[3]}),
+      surface:{band:a[4], label: a[4]==='unknown'?'Surface not recorded'
+        : a[4]==='paved'?'Paved' : a[4]==='firm'?'Firm surface':'Unpaved'},
+      wheelchair:a[5]||null, lit:a[6]||null, operator:a[7]||null, access:null,
+      sac:a[8]||null, fragments:a[9], amen:{}, lengthM:null, gainM:null };
+    if(a[10]) rec.amen.toilets=a[10];
+    if(a[11]) rec.amen.water=a[11];
+    if(a[12]) rec.amen.parking=a[12];
+    if(a[13]) rec.amen.bench=a[13];
+    out.push(rec);
+  }
+  out.droppedAsInfrastructure=F.dropped||0;
+  return out;
+}
+function useFallback(errBox, err){
+  if(!fallbackAvailable() || !S.center) return false;
+  var F=window.TS_FALLBACK;
+  var away=haversine(S.center,F.centre)/1000;
+  if(away > F.radiusKm + 25) return false;   /* out of the captured region: say so honestly */
+  S.rows=fallbackRows(S.center);
+  S.usingFallback=true;
+  S.fallbackReason = err ? err.message : 'requested';
+  $('#prov').textContent='OFFLINE COPY IN USE. The live map service did not answer ('
+    + (err?err.message:'requested for rehearsal') + '), so this list comes from a copy of the region captured on '
+    + F.captured + ' - ' + F.sites.length + ' sites within ' + F.radiusKm + ' km of Loma Linda. '
+    + 'Distances are computed live from the location you entered; surface and amenity data are as of the capture date.';
+  errBox.hidden=true;
+  refresh(); renderOutput(); renderSheet();
+  return true;
+}
+
 /* ---------- state ---------- */
-var S = { center:null, rows:[], visible:[], selected:{}, selOrder:[], env:null, showAll:false, queryMs:0, mode:'standalone' };
+var S = { center:null, rows:[], visible:[], selected:{}, selOrder:[], env:null, showAll:false, queryMs:0, mode:'standalone', usingFallback:false, fallbackReason:null };
 
 /* ---------- helpers ---------- */
 var fmtMi=function(m){ var v=m/MI; return v<10 ? v.toFixed(1) : String(Math.round(v)); };
@@ -1035,6 +1115,11 @@ function buildAvsText(){
   if(cb.lines.length){ L.push('-----------------------------------------------------------'); L.push(''); L.push.apply(L,cb.lines); }
 
   L.push('-----------------------------------------------------------');
+  if(S.usingFallback && window.TS_FALLBACK){
+    L.push('Site list from an offline copy of the region captured '+window.TS_FALLBACK.captured+',');
+    L.push('because the live map service was unavailable. Distances were computed');
+    L.push('from the location entered today.');
+  }
   L.push('Trail and park locations from OpenStreetMap contributors (ODbL).');
   L.push('Elevation from a public terrain model; air quality and weather from');
   L.push('Open-Meteo. Conditions change - check before you go.');
@@ -1214,25 +1299,46 @@ function search(keepCenter){
   var t0=Date.now();
   var radiusM=o.radiusMi*MI;
 
-  Promise.all([
-    overpass(placesQuery(S.center,radiusM)),
-    overpass(amenityQuery(S.center,Math.min(radiusM,20000))).catch(function(){return {elements:[]};}),
-    environment(S.center).catch(function(){return null;})
-  ]).then(function(res){
-    S.queryMs=Date.now()-t0;
-    var rows=shape(res[0].elements||[], S.center);
-    attachAmenities(rows, res[1].elements||[]);
-    S.rows=rows; S.env=res[2];
-    $('#prov').textContent='Sites from OpenStreetMap contributors via the Overpass API, queried live at '
-      + new Date().toLocaleTimeString()+' (ODbL). '+(res[0].elements||[]).length+' raw features grouped into '
-      + rows.length+' named sites; '+((res[1].elements||[]).length)+' amenities matched to them. '
-      + rows.droppedAsInfrastructure+' named ways were dropped as street sidewalks or unnamed infrastructure rather than places to walk.';
-    renderEnv(); refresh(); renderOutput(); renderSheet();
-  }).catch(function(e){
-    errBox.textContent='Could not complete the search: '+e.message+'. The map service is a free community endpoint and does rate-limit; wait a few seconds and try again.';
-    errBox.hidden=false;
-  }).then(function(){
+  /* Environment lives on a different host, so it may run in parallel.
+     The two Overpass calls are sequenced by overpass()'s own queue, and the
+     list is rendered the moment the sites arrive rather than waiting for
+     amenities - a clinician should not stare at a spinner for the sake of
+     a bench. */
+  environment(S.center).catch(function(){return null;}).then(function(env){
+    S.env=env; renderEnv();
+  });
+
+  if(new URLSearchParams(location.search).get('offline')==='1'){
     btn.disabled=false; btn.textContent='Find places';
+    if(useFallback(errBox,{message:'rehearsal mode, ?offline=1'})) return;
+  }
+
+  var rawCount=0;
+  overpass(placesQuery(S.center,radiusM)).then(function(j){
+    S.queryMs=Date.now()-t0;
+    rawCount=(j.elements||[]).length;
+    var rows=shape(j.elements||[], S.center);
+    S.rows=rows; S.usingFallback=false;
+    $('#prov').textContent='Sites from OpenStreetMap contributors via the Overpass API, queried live at '
+      + new Date().toLocaleTimeString()+' (ODbL). '+rawCount+' raw features grouped into '
+      + rows.length+' named sites. '
+      + rows.droppedAsInfrastructure+' named ways were dropped as street sidewalks or unnamed infrastructure rather than places to walk.';
+    refresh(); renderOutput(); renderSheet();
+    btn.disabled=false; btn.textContent='Find places';
+    /* amenities are an enrichment, not a blocker */
+    return overpass(amenityQuery(S.center,Math.min(radiusM,20000))).then(function(a){
+      attachAmenities(S.rows, a.elements||[]);
+      $('#prov').textContent += ' ' + ((a.elements||[]).length) + ' amenities matched to sites within 400 m.';
+      refresh(); renderOutput(); renderSheet();
+    }).catch(function(){
+      $('#prov').textContent += ' Amenity lookup did not complete, so restroom, water and bench information is missing rather than absent.';
+    });
+  }).catch(function(e){
+    btn.disabled=false; btn.textContent='Find places';
+    if(useFallback(errBox, e)) return;
+    errBox.textContent='Could not complete the search: '+e.message
+      + '. The map service is a free community endpoint that allows two queries at a time; it was retried three times. Wait about a minute and try again.';
+    errBox.hidden=false;
   });
 }
 
@@ -1316,7 +1422,7 @@ renderList();
 window.__TS={ G:G, COMORB:COMORB, ascii:ascii, buildAvsText:buildAvsText,
   smartPhraseTemplate:smartPhraseTemplate, epicHowTo:epicHowTo, state:S,
   haversine:haversine, rank:rank, shape:shape, classify:classify, surfaceBand:surfaceBand,
-  polyLength:polyLength, samplePoints:samplePoints, comorbBlock:comorbBlock, isLinear:isLinear, looksLikeDestination:looksLikeDestination };
+  polyLength:polyLength, samplePoints:samplePoints, comorbBlock:comorbBlock, isLinear:isLinear, looksLikeDestination:looksLikeDestination, useFallback:useFallback, fallbackRows:fallbackRows };
 
 })();
 </script>
