@@ -1,0 +1,1324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TrailScript — outdoor activity options for the After Visit Summary</title>
+<meta name="description" content="A clinician tool that finds real local walking and hiking options near a patient and produces a paste-ready block for the After Visit Summary.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+:root{
+  --ink:#16211c; --dim:#5b6b63; --faint:#8b9a92;
+  --line:#dbe3de; --bg:#fbfcfb; --panel:#f2f6f3; --card:#ffffff;
+  --acc:#1f6b4a; --acc-soft:#e6f0ea; --acc-ink:#12482f;
+  --warn:#8a5a12; --warn-soft:#fdf3e2; --warn-line:#e6d3ad;
+  --bad:#a13226; --bad-soft:#fbecea; --bad-line:#e3bdb7;
+  --info:#1d4e6b; --info-soft:#e7f0f5;
+  --shadow:0 1px 2px rgba(22,33,28,.05), 0 8px 24px -12px rgba(22,33,28,.18);
+  --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --doc:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e6ece8; --dim:#9db0a6; --faint:#74867c;
+    --line:#2b3833; --bg:#121816; --panel:#1a221f; --card:#171f1c;
+    --acc:#5fbf8f; --acc-soft:#172e24; --acc-ink:#9fdcbd;
+    --warn:#d8a75a; --warn-soft:#2a2115; --warn-line:#4a3a1c;
+    --bad:#e08376; --bad-soft:#2c1917; --bad-line:#4d2b26;
+    --info:#7fb8d6; --info-soft:#152730;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+h1,h2,h3{text-wrap:balance}
+
+.app{display:grid;grid-template-columns:352px minmax(0,1fr);min-height:100vh}
+@media (max-width:960px){.app{grid-template-columns:1fr}}
+
+/* ---------- rail ---------- */
+.rail{background:var(--panel);border-right:1px solid var(--line);padding:18px 18px 48px;display:flex;flex-direction:column;gap:16px}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand b{font-size:18px;letter-spacing:-.015em}
+.brand span{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--acc);font-weight:700}
+.tagline{font-size:12px;color:var(--dim);margin:4px 0 0;line-height:1.4}
+
+.step{border:1px solid var(--line);border-radius:11px;background:var(--card);padding:13px 13px 14px;box-shadow:var(--shadow)}
+.step>h2{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);font-weight:700;display:flex;align-items:center;gap:7px}
+.step>h2 i{font-style:normal;width:17px;height:17px;border-radius:5px;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:10.5px;font-weight:700;flex:none}
+.f{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+.f:last-child{margin-bottom:0}
+.f>label{font-size:11.5px;color:var(--dim);font-weight:600}
+input[type=text],input[type=search],select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;width:100%;font-variant-numeric:tabular-nums}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.hint{font-size:11px;color:var(--faint);line-height:1.45}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 11px;font-size:12.5px;cursor:pointer;user-select:none}
+.chip[aria-pressed=true]{background:var(--acc-soft);border-color:var(--acc);color:var(--acc-ink);font-weight:650}
+.go{background:var(--acc);color:#fff;border:0;border-radius:9px;padding:11px 14px;font-weight:700;font-size:14px;cursor:pointer;width:100%}
+.go:disabled{opacity:.55;cursor:progress}
+.go.sm{padding:8px 12px;font-size:13px;width:auto}
+
+.privacy{background:var(--warn-soft);border:1px solid var(--warn-line);border-radius:8px;padding:8px 10px;font-size:11.5px;color:var(--warn);line-height:1.45}
+
+.ctx{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:10px 12px;font-size:12.5px}
+.ctx .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.11em;color:var(--faint);font-weight:700}
+.ctx .who{font-weight:700;font-size:14px;margin-top:2px}
+.ctx .meta{color:var(--dim);margin-top:1px}
+.ctx.off{background:var(--info-soft);border-color:transparent}
+
+/* ---------- main ---------- */
+.main{padding:20px 24px 70px;min-width:0}
+.mhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mhead h1{font-size:20px;margin:0;letter-spacing:-.015em}
+.mhead .count{color:var(--dim);font-size:13px;font-variant-numeric:tabular-nums}
+.prov{font-size:11.5px;color:var(--faint);margin:4px 0 0;line-height:1.5}
+
+.env{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
+.e{border:1px solid var(--line);border-radius:9px;background:var(--card);padding:8px 11px;min-width:104px}
+.e b{display:block;font-size:17px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.2}
+.e span{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.e.flag{background:var(--warn-soft);border-color:var(--warn-line)}
+.e.flag b{color:var(--warn)}
+.e em{display:block;font-style:normal;font-size:11px;color:var(--dim);margin-top:3px}
+
+.list{display:grid;gap:9px;margin-top:14px}
+.r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start;border:1px solid var(--line);border-left-width:4px;border-radius:11px;background:var(--card);padding:12px 14px 12px 12px;box-shadow:var(--shadow)}
+.r.sel{border-color:var(--acc);background:var(--acc-soft)}
+.r[data-kind=park]{border-left-color:#c7d5cd}
+.r[data-kind=paved]{border-left-color:#6f9fb8}
+.r[data-kind=trail]{border-left-color:#2f8a5c}
+.r[data-kind=preserve]{border-left-color:#15563a}
+.pick{width:23px;height:23px;border-radius:6px;border:1.5px solid var(--line);background:var(--bg);cursor:pointer;display:grid;place-items:center;font-size:13px;color:var(--acc);margin-top:1px;flex:none}
+.r.sel .pick{border-color:var(--acc);background:var(--acc);color:#fff}
+.r h3{margin:0;font-size:15px;font-weight:650;letter-spacing:-.01em}
+.r .sub{color:var(--dim);font-size:12.5px;margin-top:1px}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.t{font-size:11px;padding:2px 7px;border-radius:5px;background:var(--panel);color:var(--dim);border:1px solid var(--line)}
+.t.k{background:var(--acc-soft);color:var(--acc-ink);border-color:transparent;font-weight:650}
+.t.u{background:transparent;color:var(--faint);border-style:dashed}
+.t.w{background:var(--warn-soft);color:var(--warn);border-color:var(--warn-line)}
+.dist{text-align:right;flex:none}
+.dist b{display:block;font-size:19px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1}
+.dist span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.at{display:inline-block;margin-top:6px;font-size:11.5px;color:var(--acc);text-decoration:none;border-bottom:1px solid currentColor}
+.more{border:1px dashed var(--line);background:transparent;color:var(--dim);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;width:100%}
+.empty{border:1px dashed var(--line);border-radius:12px;padding:36px 22px;text-align:center;color:var(--dim);margin-top:14px}
+.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:5px}
+.err{background:var(--bad-soft);border:1px solid var(--bad-line);color:var(--bad);border-radius:10px;padding:12px 14px;font-size:13px;margin-top:14px}
+
+/* ---------- the output block: the whole point of the tool ---------- */
+.out{margin-top:20px;border:2px solid var(--acc);border-radius:14px;background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
+.out>header{background:var(--acc);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.out>header b{font-size:14px;letter-spacing:.01em}
+.out>header .sp{margin-left:auto;display:flex;gap:8px}
+.out .cta{background:#fff;color:var(--acc-ink);border:0;border-radius:8px;padding:8px 15px;font-size:13.5px;font-weight:750;cursor:pointer}
+.out .cta.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.55)}
+.out .body{padding:14px 16px 18px}
+.paste{width:100%;min-height:260px;font-family:var(--mono);font-size:12px;line-height:1.55;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel);resize:vertical;white-space:pre}
+.outnote{font-size:11.5px;color:var(--dim);margin:0 0 8px}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer}
+.tab[aria-selected=true]{background:var(--acc-soft);border-color:var(--acc);color:var(--acc-ink);font-weight:650}
+
+/* ---------- clinical draft banner ---------- */
+.draft{background:var(--bad-soft);border:1px solid var(--bad-line);border-left:5px solid var(--bad);border-radius:10px;padding:11px 14px;margin:0 0 12px}
+.draft b{color:var(--bad);display:block;font-size:12.5px;text-transform:uppercase;letter-spacing:.06em}
+.draft p{margin:4px 0 0;font-size:12.5px;color:var(--ink);line-height:1.5}
+.q{border-left:3px solid var(--acc);padding:6px 0 6px 12px;margin:10px 0;font-family:var(--doc);font-size:14.5px}
+.q cite{display:block;font-family:var(--ui);font-style:normal;font-size:11px;color:var(--faint);margin-top:5px}
+
+.sheetwrap{margin-top:18px;border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
+.sheetwrap>header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 15px;border-bottom:1px solid var(--line);background:var(--panel);font-size:13px;font-weight:650}
+.sheetwrap>header .sp{margin-left:auto;display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:650;cursor:pointer}
+.paper{background:#fff;color:#16211c;padding:26px 30px;font-family:var(--doc);font-size:14.5px;line-height:1.55}
+.paper h2{font-family:var(--doc);font-size:21px;margin:0 0 2px;font-weight:600}
+.paper .pmeta{font-family:var(--ui);font-size:11px;color:#5b6b63;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+.paper .rx{border-left:3px solid #1f6b4a;padding:8px 0 8px 13px;margin:0 0 16px;font-size:15px}
+.plc{display:grid;grid-template-columns:1fr 96px;gap:16px;padding:13px 0;border-top:1px solid #e2e8e4}
+.plc h3{font-family:var(--doc);margin:0;font-size:16.5px;font-weight:600}
+.plc .where{font-family:var(--ui);font-size:12px;color:#5b6b63;margin-top:2px}
+.plc .facts{font-family:var(--ui);font-size:12.5px;margin-top:6px;color:#2c3a34}
+.plc canvas.qr{width:88px;height:88px;image-rendering:pixelated;border:1px solid #e2e8e4;border-radius:5px}
+.paper .care{font-family:var(--ui);font-size:12.5px;background:#f7faf8;border:1px solid #e2e8e4;border-radius:8px;padding:11px 13px;margin-top:16px}
+.paper .care b{display:block;margin-bottom:4px}
+.paper footer{font-family:var(--ui);font-size:10.5px;color:#77877e;border-top:1px solid #e2e8e4;margin-top:14px;padding-top:10px}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13.5px;font-weight:650;box-shadow:var(--shadow);z-index:60}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@media print{
+  body{background:#fff}
+  .rail,.mhead,.prov,.env,.list,.out,.sheetwrap>header,.toast,.empty,#err{display:none!important}
+  .app{display:block}.main{padding:0}
+  .sheetwrap{border:0;box-shadow:none;margin:0}
+  .paper{padding:0}
+  .plc{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="rail">
+    <div>
+      <div class="brand"><b>TrailScript</b><span>Lifestyle Rx</span></div>
+      <p class="tagline">Outdoor activity options for the After Visit Summary.</p>
+    </div>
+
+    <div class="ctx off" id="ctx">
+      <div class="lbl">Mode</div>
+      <div class="who" id="ctxWho">Standalone</div>
+      <div class="meta" id="ctxMeta">Opened from a SmartPhrase link. Enter the patient's location below.</div>
+    </div>
+
+    <section class="step">
+      <h2><i>1</i>Where does the patient start from?</h2>
+      <div class="f">
+        <label for="zip">ZIP code</label>
+        <input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="92354" autocomplete="off">
+        <p class="hint" id="zipEcho"></p>
+      </div>
+      <div class="f">
+        <label for="landmark">Or a nearby landmark, to tighten the radius</label>
+        <input type="search" id="landmark" placeholder="e.g. Redlands Community Hospital" autocomplete="off">
+        <p class="privacy"><b>Do not type a patient's home address.</b> Use a cross-street, a school, a store, or a hospital near them. This text is sent to OpenStreetMap's public geocoder; the ZIP code is not.</p>
+        <button class="go sm" id="findLandmark" type="button">Use this landmark</button>
+        <p class="hint" id="lmEcho"></p>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2><i>2</i>What is the patient able to do?</h2>
+      <div class="f">
+        <label for="comorb">Comorbidity or limitation</label>
+        <select id="comorb">
+          <option value="none" selected>None specified / general adult</option>
+          <option value="cad">Coronary artery disease / post-MI</option>
+          <option value="hf">Heart failure</option>
+          <option value="t2dm">Type 2 diabetes</option>
+          <option value="obesity">Obesity</option>
+          <option value="oa">Knee or hip osteoarthritis</option>
+          <option value="copd">COPD or asthma</option>
+          <option value="pad">Peripheral arterial disease</option>
+          <option value="decond">Deconditioned / just starting out</option>
+          <option value="mobility">Uses a wheelchair or walker</option>
+        </select>
+        <p class="hint" id="comorbNote">Sets the filters below to a conservative starting point. You can override every one of them.</p>
+      </div>
+      <div class="row2">
+        <div class="f">
+          <label for="radius">Willing to travel</label>
+          <select id="radius">
+            <option value="2">2 miles</option>
+            <option value="5">5 miles</option>
+            <option value="10" selected>10 miles</option>
+            <option value="20">20 miles</option>
+            <option value="35">35 miles</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="maxgain">Max elevation gain</label>
+          <select id="maxgain">
+            <option value="9999" selected>Any</option>
+            <option value="30">Flat (under 100 ft)</option>
+            <option value="90">Gentle (under 300 ft)</option>
+            <option value="180">Moderate (under 600 ft)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="f">
+          <label for="maxlen">Max trail length</label>
+          <select id="maxlen">
+            <option value="9999" selected>Any</option>
+            <option value="0.5">Under 0.5 mi</option>
+            <option value="1">Under 1 mi</option>
+            <option value="2">Under 2 mi</option>
+            <option value="5">Under 5 mi</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="surf">Surface</label>
+          <select id="surf">
+            <option value="any" selected>Any</option>
+            <option value="prefer">Prefer paved</option>
+            <option value="strict">Confirmed paved only</option>
+          </select>
+        </div>
+      </div>
+      <div class="f">
+        <label>Must have</label>
+        <div class="chips" id="amen">
+          <button class="chip" data-a="toilets" aria-pressed="false" type="button">Restroom</button>
+          <button class="chip" data-a="water" aria-pressed="false" type="button">Water</button>
+          <button class="chip" data-a="parking" aria-pressed="false" type="button">Parking</button>
+          <button class="chip" data-a="bench" aria-pressed="false" type="button">Benches</button>
+        </div>
+        <p class="hint">Filters on amenities actually mapped at the site. Sites with none mapped are not hidden unless you tick something here.</p>
+      </div>
+      <div class="f">
+        <label>Show</label>
+        <div class="chips" id="kinds">
+          <button class="chip" data-k="park" aria-pressed="true" type="button">Parks</button>
+          <button class="chip" data-k="trail" aria-pressed="true" type="button">Trails</button>
+          <button class="chip" data-k="paved" aria-pressed="true" type="button">Paths</button>
+          <button class="chip" data-k="preserve" aria-pressed="true" type="button">Preserves</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2><i>3</i>What are you prescribing?</h2>
+      <div class="f">
+        <label for="rx">Activity plan printed for the patient</label>
+        <select id="rx">
+          <option value="">No plan line</option>
+          <option value="Walk 10 minutes, 3 days a week, and build up from there.">10 min, 3 days/week</option>
+          <option value="Walk 20 minutes, 3 days a week." selected>20 min, 3 days/week</option>
+          <option value="Walk 30 minutes, 5 days a week.">30 min, 5 days/week</option>
+          <option value="Aim for 150 minutes of moderate activity each week.">150 min/week total</option>
+        </select>
+      </div>
+      <button class="go" id="search" type="button">Find places</button>
+      <p class="hint" style="margin-top:9px">Read-only. No patient data is entered, stored, or transmitted. The ZIP code is converted to a map coordinate inside this browser.</p>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="mhead">
+      <h1 id="mtitle">Nearby outdoor options</h1>
+      <div class="count" id="mcount"></div>
+    </div>
+    <p class="prov" id="prov">Enter a ZIP code and press <b>Find places</b>. Any US ZIP works.</p>
+    <p class="prov" id="cover"></p>
+
+    <div class="env" id="env" hidden></div>
+    <div id="err" hidden class="err"></div>
+    <div class="list" id="list"></div>
+
+    <section class="out" id="out" hidden>
+      <header>
+        <b>&#9660; PASTE THIS INTO THE SMARTPHRASE &#9660;</b>
+        <span class="sp">
+          <button class="cta" id="copyOut" type="button">Copy for the After Visit Summary</button>
+          <button class="cta ghost" id="copyPhrase" type="button">Copy the SmartPhrase template</button>
+        </span>
+      </header>
+      <div class="body">
+        <div class="tabs" id="outTabs">
+          <button class="tab" data-t="avs" aria-selected="true" type="button">After Visit Summary text</button>
+          <button class="tab" data-t="phrase" aria-selected="false" type="button">SmartPhrase template (.WALKRX)</button>
+          <button class="tab" data-t="epic" aria-selected="false" type="button">How to build it in Epic</button>
+        </div>
+        <p class="outnote" id="outNote"></p>
+        <textarea class="paste" id="pasteBox" readonly spellcheck="false"></textarea>
+      </div>
+    </section>
+
+    <section class="sheetwrap" id="sheet" hidden>
+      <header>
+        Printable handout preview
+        <span class="count" id="selCount"></span>
+        <span class="sp"><button class="btn" id="print" type="button">Print</button></span>
+      </header>
+      <div class="paper" id="paper"></div>
+    </section>
+  </main>
+</div>
+
+<script src="zips.js"></script>
+<script src="qrcode.min.js"></script>
+<script src="fhir-client.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ==================================================================
+ * TrailScript - clinician tool, Plan B (no Epic integration required)
+ *
+ * Three rules this file is built on:
+ *   1. Never state a fact the data does not contain. Untagged is
+ *      rendered as "not recorded", never guessed.
+ *   2. The clinician prescribes. Any clinical sentence here is either
+ *      a verbatim guideline quote with a citation, or is explicitly
+ *      flagged as an unreviewed draft. Nothing in between.
+ *   3. Read-only, no storage, no PHI. The ZIP never leaves the browser.
+ * ================================================================== */
+
+var MI = 1609.344, FT = 3.280839895;
+var $ = function(s){ return document.querySelector(s); };
+function el(t,c,x){ var n=document.createElement(t); if(c)n.className=c; if(x!=null)n.textContent=x; return n; }
+
+/* ---------- guideline text: verbatim, with provenance ----------
+   Mirrors evidence/guideline-quotes.json. A build test asserts the
+   two agree, so a quote cannot drift here without failing loudly. */
+var G = {
+  accaha2019_pa: {
+    quote:"Adults should engage in at least 150 minutes per week of accumulated moderate-intensity physical activity or 75 minutes per week of vigorous-intensity physical activity.",
+    cite:"2019 ACC/AHA Guideline on the Primary Prevention of Cardiovascular Disease. Circulation. 2019;140(11):e596-e646."
+  },
+  pag2018_chronic: {
+    quote:"Adults with chronic conditions or disabilities, who are able, should follow the key guidelines for adults and do both aerobic and muscle-strengthening activities.",
+    cite:"Piercy KL, et al. The Physical Activity Guidelines for Americans. JAMA. 2018;320(19):2020-2028."
+  },
+  pag2018_movemore: {
+    quote:"Recommendations emphasize that moving more and sitting less will benefit nearly everyone. Individuals performing the least physical activity benefit most by even modest increases in moderate-to-vigorous physical activity.",
+    cite:"Piercy KL, et al. The Physical Activity Guidelines for Americans. JAMA. 2018;320(19):2020-2028."
+  },
+  pag2018_adults: {
+    quote:"Adults should do at least 150 minutes to 300 minutes a week of moderate-intensity, or 75 minutes to 150 minutes a week of vigorous-intensity aerobic physical activity, or an equivalent combination of moderate- and vigorous-intensity aerobic activity. They should also do muscle-strengthening activities on 2 or more days a week.",
+    cite:"Piercy KL, et al. The Physical Activity Guidelines for Americans. JAMA. 2018;320(19):2020-2028."
+  },
+  pag2018_older: {
+    quote:"Older adults should do multicomponent physical activity that includes balance training as well as aerobic and muscle-strengthening activities.",
+    cite:"Piercy KL, et al. The Physical Activity Guidelines for Americans. JAMA. 2018;320(19):2020-2028."
+  },
+  ada2026_dpp150: {
+    quote:"Refer adults with overweight or obesity at high risk of type 2 diabetes to a diabetes prevention program to achieve and maintain a weight reduction of at least 5-7% of initial body weight through a healthy reduced-calorie eating pattern and >=150 min/week of moderate-intensity physical activity.",
+    cite:"ADA Professional Practice Committee. Standards of Care in Diabetes-2026, Section 3. Diabetes Care. 2026;49(Suppl 1):S50-S75. (Recommendation 3.3)"
+  },
+  ada2026_dpp44: {
+    quote:"Obtaining at least 150 min of physical activity per week, even without achieving the weight loss goal, reduced incidence of type 2 diabetes by 44%.",
+    cite:"ADA Professional Practice Committee. Standards of Care in Diabetes-2026, Section 3. Diabetes Care. 2026;49(Suppl 1):S50-S75."
+  },
+  ada2026_strength75: {
+    quote:"A maximum of 75 min of strength training could be applied toward the total 150 min/week physical activity goal.",
+    cite:"ADA Professional Practice Committee. Standards of Care in Diabetes-2026, Section 3. Diabetes Care. 2026;49(Suppl 1):S50-S75."
+  }
+};
+
+/* ---------- comorbidity profiles ----------
+   `preset`  : filter defaults only. Not advice - the clinician overrides.
+   `quotes`  : verbatim guideline lines, always shown with their citation.
+   `draft`   : plain-language talking points. NOT guideline text. Every one
+               of these is rendered under the unreviewed-draft banner and
+               carries the same warning in the pasted output. */
+var COMORB = {
+  none: { label:"General adult",
+    preset:{maxgain:"9999", maxlen:"9999", surf:"any", radius:"10", amen:[]},
+    quotes:["pag2018_adults","accaha2019_pa"],
+    draft:[] },
+
+  cad: { label:"Coronary artery disease / post-MI",
+    preset:{maxgain:"90", maxlen:"2", surf:"prefer", radius:"10", amen:["parking","bench"]},
+    quotes:["pag2018_chronic","accaha2019_pa"],
+    draft:[
+      "Confirm this patient has been cleared for unsupervised exercise, and consider cardiac rehabilitation referral if that has not already happened.",
+      "Stop and seek care for chest pressure or pain, unusual breathlessness, light-headedness, or an irregular heartbeat.",
+      "Carry nitroglycerin if it has been prescribed, and walk with a companion or a charged phone.",
+      "Start at a pace that still allows conversation, and lengthen the walk before increasing the pace.",
+      "Sites with parking close to the path and benches to rest on were prioritised for this reason."
+    ] },
+
+  hf: { label:"Heart failure",
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["parking","bench","toilets"]},
+    quotes:["pag2018_chronic","pag2018_movemore"],
+    draft:[
+      "Confirm the patient is euvolaemic and clinically stable before recommending a new outdoor routine.",
+      "Ask the patient to weigh daily and to report a rapid weight gain, increasing breathlessness, or new swelling rather than pushing through it.",
+      "Short, flat, repeatable walks close to home beat one long walk. Sites were filtered to flat and short for this reason.",
+      "Heat and humidity worsen symptoms; check the temperature panel above before recommending a midday walk."
+    ] },
+
+  t2dm: { label:"Type 2 diabetes",
+    preset:{maxgain:"9999", maxlen:"2", surf:"prefer", radius:"10", amen:["toilets","water"]},
+    quotes:["ada2026_dpp150","ada2026_dpp44","ada2026_strength75"],
+    draft:[
+      "Check feet before and after walking, and make sure footwear fits - especially where there is any peripheral neuropathy.",
+      "If the patient takes insulin or a sulfonylurea, discuss hypoglycaemia risk and carrying a fast-acting carbohydrate.",
+      "Advise carrying water; sites with mapped drinking water were prioritised.",
+      "Walking after meals is a practical way to fit activity in and may help post-meal glucose - worth raising if the patient is looking for a routine."
+    ] },
+
+  obesity: { label:"Obesity",
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["parking","bench"]},
+    quotes:["ada2026_dpp150","pag2018_movemore"],
+    draft:[
+      "Frame the first target as showing up, not as distance. Short and repeatable beats ambitious and abandoned.",
+      "Flat, paved, shaded routes with somewhere to sit reduce the number of reasons not to go, and sites were filtered accordingly.",
+      "Watch for joint pain, particularly knees; if walking hurts, raise water-based options or a shorter route rather than stopping activity altogether."
+    ] },
+
+  oa: { label:"Knee or hip osteoarthritis",
+    preset:{maxgain:"30", maxlen:"1", surf:"strict", radius:"10", amen:["parking","bench"]},
+    quotes:["pag2018_chronic"],
+    draft:[
+      "Even, level surfaces matter more than distance here - the filter was set to confirmed-paved for that reason, which does narrow the list.",
+      "Some soreness during and shortly after walking is expected; pain that is still worse the next day suggests the walk was too long.",
+      "Downhill loading is often the harder part, so a flat loop is usually kinder than an out-and-back on a slope.",
+      "Benches let the patient break one walk into two, which is often the difference between going and not going."
+    ] },
+
+  copd: { label:"COPD or asthma",
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["parking","bench"]},
+    quotes:["pag2018_chronic","pag2018_movemore"],
+    draft:[
+      "Check the air quality panel above before recommending a specific day - the Inland Empire regularly exceeds levels that matter for this patient.",
+      "Advise carrying a rescue inhaler and using it beforehand if that has been prescribed.",
+      "Pursed-lip breathing and planned rest stops let a patient walk further in total than pushing straight through.",
+      "Cold, dry air and wildfire smoke are both common triggers; an indoor alternative on bad-air days is worth naming explicitly."
+    ] },
+
+  pad: { label:"Peripheral arterial disease",
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["bench","parking"]},
+    quotes:["pag2018_chronic"],
+    draft:[
+      "Supervised exercise therapy is the better-supported option where it is available - consider referral before recommending walking alone.",
+      "Walking to the point of moderate claudication, resting, then resuming is the usual structure. Benches make that structure possible, and sites were filtered for them.",
+      "Check feet for wounds after walking; healing is slower here and a blister is not a small problem.",
+      "Rest pain at night, or a wound that is not healing, needs review rather than more walking."
+    ] },
+
+  decond: { label:"Deconditioned / just starting out",
+    preset:{maxgain:"30", maxlen:"0.5", surf:"prefer", radius:"5", amen:["parking","bench"]},
+    quotes:["pag2018_movemore","pag2018_older"],
+    draft:[
+      "The first goal is a habit, not a distance. Ten minutes counts.",
+      "Closer to home wins - the radius was tightened for that reason.",
+      "Suggest attaching the walk to something that already happens daily, such as after dinner."
+    ] },
+
+  mobility: { label:"Uses a wheelchair or walker",
+    preset:{maxgain:"30", maxlen:"9999", surf:"strict", radius:"10", amen:["parking","toilets"]},
+    quotes:["pag2018_chronic"],
+    draft:[
+      "Surface and grade decide whether a site is usable, and the map data records surface for only a minority of places - so call ahead or check a satellite view before the patient makes a trip.",
+      "Accessible parking close to the path matters more than the length of the path.",
+      "Where a site carries a wheelchair-access tag it is shown; the absence of that tag means the data is silent, not that the site is inaccessible."
+    ] }
+};
+
+/* ---------- geo ---------- */
+function haversine(a,b){
+  var R=6371000, r=function(x){return x*Math.PI/180;};
+  var dLat=r(b.lat-a.lat), dLon=r(b.lon-a.lon);
+  var s=Math.pow(Math.sin(dLat/2),2)+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.pow(Math.sin(dLon/2),2);
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+function lookupZip(z){
+  var rec = window.ZIPS && window.ZIPS[z];
+  if(!rec) return null;
+  return { lat:rec[0], lon:rec[1], city:rec[2], state:rec[3], zip:z, src:'zip' };
+}
+
+/* ---------- classification: only from tags that exist ---------- */
+var SURFACE_PAVED = {asphalt:1,paved:1,concrete:1,"concrete:plates":1,paving_stones:1,chipseal:1};
+var SURFACE_FIRM  = {compacted:1,fine_gravel:1,gravel:1,pebblestone:1,sett:1,wood:1,metal:1};
+function classify(t){
+  if(t.leisure==='nature_reserve') return 'preserve';
+  if(t.leisure==='park'||t.leisure==='garden') return 'park';
+  if(t.route==='hiking'||t.highway==='path'||t.highway==='track'||t.highway==='bridleway') return 'trail';
+  if(t.highway==='cycleway'||t.highway==='footway'||t.route==='foot') return 'paved';
+  return 'park';
+}
+var KIND_LABEL = {park:'Park or green space', preserve:'Nature preserve', trail:'Trail', paved:'Path or greenway'};
+
+/* ---------- is this a place, or is it a line on a map? ----------
+ * Raw OpenStreetMap "named paths" near a city are mostly sidewalks carrying
+ * the adjacent street's name. A live query around Loma Linda returned
+ * "Mountain View Avenue", "West Lugonia Avenue", a way simply called
+ * "Sidewalk", and one called "Snakes on a plane!!". Handing a patient a
+ * printout that calls Mountain View Avenue a hiking trail would discredit
+ * the whole tool, so linear features must look like a destination before
+ * they are offered. Parks and preserves are destinations by definition.
+ * The count of what this removes is reported to the clinician - a filter
+ * that silently drops things is how you end up trusting a short list.
+ */
+var DEST_WORD = /(trail|trailhead|path(?!way)|loop|greenway|parkway|preserve|park|garden|wash|creek|canyon|ridge|peak|summit|route|promenade|riverwalk|boardwalk|bikeway|corridor|open space|nature|conservan|arboretum)/i;
+var STREET_SUFFIX = /\b(avenue|ave|street|st|road|rd|drive|dr|boulevard|blvd|lane|ln|court|ct|place|pl|circle|cir|terrace|ter|highway|hwy|freeway|expressway)\b\.?$/i;
+var JUNK_NAME = /^(sidewalk|footpath|path|trail|walkway|crossing|driveway|alley|steps|stairs)$/i;
+
+function looksLikeDestination(tags, kind){
+  if(kind==='park'||kind==='preserve') return true;
+  var name=(tags.name||'').trim();
+  if(!name || JUNK_NAME.test(name)) return false;
+  /* A signed hiking route is a destination whatever it is called. */
+  if(tags.route==='hiking') return true;
+  /* Sidewalks and street crossings are infrastructure, not somewhere to go. */
+  if(tags.footway==='sidewalk'||tags.footway==='crossing'||tags.footway==='access_aisle') return false;
+  if(tags.highway==='footway' && !DEST_WORD.test(name)) return false;
+  /* "West Lugonia Avenue" is a street the path runs beside. */
+  if(STREET_SUFFIX.test(name) && !DEST_WORD.test(name)) return false;
+  if(!DEST_WORD.test(name) && (tags.highway==='cycleway')) return false;
+  return true;
+}
+function surfaceBand(t){
+  var s=(t.surface||'').toLowerCase();
+  if(!s) return {band:'unknown', label:'Surface not recorded'};
+  if(SURFACE_PAVED[s]) return {band:'paved', label:'Paved'};
+  if(SURFACE_FIRM[s]) return {band:'firm', label:'Firm surface ('+s.replace(/_/g,' ')+')'};
+  return {band:'soft', label:'Unpaved ('+s.replace(/_/g,' ')+')'};
+}
+
+/* ---------- endpoints ---------- */
+var OVERPASS='https://overpass-api.de/api/interpreter';
+var NOMINATIM='https://nominatim.openstreetmap.org/search';
+var ELEV='https://api.open-meteo.com/v1/elevation';
+var AQ='https://air-quality-api.open-meteo.com/v1/air-quality';
+var WX='https://api.open-meteo.com/v1/forecast';
+
+function overpass(q){
+  return fetch(OVERPASS,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'data='+encodeURIComponent(q)}).then(function(r){
+      if(!r.ok) throw new Error('map service HTTP '+r.status);
+      return r.text();
+    }).then(function(txt){
+      if(txt.charAt(0)!=='{') throw new Error('the map service is rate-limiting right now');
+      return JSON.parse(txt);
+    });
+}
+function placesQuery(c,radiusM){
+  var R=Math.round(radiusM), wide=R>25000;
+  var hw = wide ? '^(path|track|cycleway)$' : '^(path|footway|cycleway|track|bridleway)$';
+  return '[out:json][timeout:25];\n(\n'
+    + ' nwr["leisure"~"^(park|nature_reserve|garden)$"]["name"](around:'+R+','+c.lat+','+c.lon+');\n'
+    + ' way["highway"~"'+hw+'"]["name"](around:'+R+','+c.lat+','+c.lon+');\n'
+    + ' relation["route"~"^(hiking|foot)$"]["name"](around:'+R+','+c.lat+','+c.lon+');\n'
+    + ');\nout center tags 500;';
+}
+function amenityQuery(c,radiusM){
+  var R=Math.round(radiusM);
+  return '[out:json][timeout:25];\n(\n'
+    + ' nwr["amenity"~"^(toilets|drinking_water|parking)$"](around:'+R+','+c.lat+','+c.lon+');\n'
+    + ' node["amenity"="bench"](around:'+R+','+c.lat+','+c.lon+');\n'
+    + ');\nout center 900;';
+}
+var AMEN_KEY={toilets:'toilets', drinking_water:'water', parking:'parking', bench:'bench'};
+
+/* ---------- shaping ---------- */
+function shape(elements,center){
+  var byName={}, order=[], dropped=0;
+  for(var i=0;i<elements.length;i++){
+    var e=elements[i], tags=e.tags||{};
+    if(!tags.name) continue;
+    var lat = e.lat!=null ? e.lat : (e.center&&e.center.lat);
+    var lon = e.lon!=null ? e.lon : (e.center&&e.center.lon);
+    if(lat==null||lon==null) continue;
+    var kind=classify(tags);
+    if(!looksLikeDestination(tags,kind)){ dropped++; continue; }
+    var key=tags.name.toLowerCase()+'|'+kind;
+    var meters=haversine(center,{lat:lat,lon:lon});
+    var rec={ id:e.type+'/'+e.id, osmType:e.type, osmId:e.id, name:tags.name, kind:kind,
+      lat:lat, lon:lon, meters:meters, surface:surfaceBand(tags),
+      wheelchair:tags.wheelchair||null, lit:tags.lit||null, operator:tags.operator||null,
+      access:tags.access||null, sac:tags.sac_scale||null, fragments:1, amen:{}, lengthM:null, gainM:null };
+    var prev=byName[key];
+    if(!prev){ byName[key]=rec; order.push(key); }
+    else {
+      prev.fragments++;
+      if(meters<prev.meters){ rec.fragments=prev.fragments; byName[key]=rec; }
+    }
+  }
+  var out=order.map(function(k){ return byName[k]; });
+  out.droppedAsInfrastructure=dropped;
+  return out;
+}
+
+/* Attach amenities to the nearest place within 400 m. A bench 3 km away
+   is not this park's bench, and pretending otherwise would be the kind of
+   quiet lie this tool exists to avoid. */
+function attachAmenities(rows, amenEls){
+  var AT=400;
+  for(var i=0;i<amenEls.length;i++){
+    var a=amenEls[i], t=a.tags||{};
+    var key=AMEN_KEY[t.amenity]; if(!key) continue;
+    var lat=a.lat!=null?a.lat:(a.center&&a.center.lat), lon=a.lon!=null?a.lon:(a.center&&a.center.lon);
+    if(lat==null||lon==null) continue;
+    var best=null, bestD=AT;
+    for(var j=0;j<rows.length;j++){
+      var d=haversine({lat:lat,lon:lon},{lat:rows[j].lat,lon:rows[j].lon});
+      if(d<bestD){ bestD=d; best=rows[j]; }
+    }
+    if(best) best.amen[key]=(best.amen[key]||0)+1;
+  }
+}
+
+function rank(rows,opts){
+  var maxM=opts.radiusMi*MI;
+  var inScope=rows.filter(function(r){
+    return r.meters<=maxM && opts.kinds[r.kind] && r.access!=='private' && r.access!=='no';
+  });
+  var kept=inScope.filter(function(r){
+    if(opts.surface==='strict' && r.surface.band!=='paved') return false;
+    for(var k=0;k<opts.amen.length;k++){ if(!r.amen[opts.amen[k]]) return false; }
+    return true;
+  });
+  var dest=function(k){ return (k==='park'||k==='preserve')?0:1; };
+  var pavedFirst=function(r){ return (opts.surface==='prefer' && r.surface.band==='paved')?0:1; };
+  var out=kept.slice().sort(function(a,b){
+    if(pavedFirst(a)!==pavedFirst(b)) return pavedFirst(a)-pavedFirst(b);
+    if(dest(a.kind)!==dest(b.kind)) return dest(a.kind)-dest(b.kind);
+    return a.meters-b.meters;
+  });
+  out.inScope=inScope.length;
+  out.hiddenSurface = opts.surface==='strict' ? inScope.filter(function(r){return r.surface.band!=='paved';}).length : 0;
+  out.hiddenAmen = inScope.length - kept.length - out.hiddenSurface;
+  if(out.hiddenAmen<0) out.hiddenAmen=0;
+  out.noSurfaceData = inScope.filter(function(r){return r.surface.band==='unknown';}).length;
+  return out;
+}
+
+/* ---------- trail length + elevation gain, fetched only when needed ----------
+   OSM splits a named trail into many way fragments, so a length taken from
+   one fragment is wrong. For a hiking route relation we sum its members.
+   Elevation is not in OSM at all; it comes from a terrain model, sampled
+   along the geometry. Both are computed for selected places only. */
+function geomQuery(rows){
+  var ids={way:[],relation:[]};
+  rows.forEach(function(r){ if(ids[r.osmType]) ids[r.osmType].push(r.osmId); });
+  var parts=[];
+  if(ids.way.length) parts.push(' way(id:'+ids.way.join(',')+');');
+  if(ids.relation.length) parts.push(' relation(id:'+ids.relation.join(',')+');');
+  if(!parts.length) return null;
+  return '[out:json][timeout:25];\n('+parts.join('\n')+'\n);\nout geom;';
+}
+function polyOf(e){
+  if(e.geometry) return e.geometry;
+  if(e.members){
+    var pts=[];
+    e.members.forEach(function(m){ if(m.geometry) pts=pts.concat(m.geometry); });
+    return pts;
+  }
+  return null;
+}
+function polyLength(pts){
+  if(!pts||pts.length<2) return null;
+  var L=0; for(var i=1;i<pts.length;i++) L+=haversine(pts[i-1],pts[i]);
+  return L;
+}
+function samplePoints(pts,n){
+  if(!pts||pts.length<2) return [];
+  if(pts.length<=n) return pts.slice();
+  var out=[], step=(pts.length-1)/(n-1);
+  for(var i=0;i<n;i++) out.push(pts[Math.round(i*step)]);
+  return out;
+}
+function elevationGain(samples){
+  return fetch(ELEV+'?latitude='+samples.map(function(p){return p.lat.toFixed(5);}).join(',')
+    +'&longitude='+samples.map(function(p){return p.lon.toFixed(5);}).join(','))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var e=j.elevation||[];
+      if(e.length<2) return null;
+      var gain=0;
+      for(var i=1;i<e.length;i++){ var d=e[i]-e[i-1]; if(d>0) gain+=d; }
+      return {gain:gain, min:Math.min.apply(null,e), max:Math.max.apply(null,e), n:e.length};
+    });
+}
+
+/* ---------- environment: air quality, heat, UV ----------
+   Included because in San Bernardino County they are not garnish. The
+   Inland Empire has some of the worst ozone and PM2.5 in the country, and
+   an August afternoon here is a real contraindication to a midday walk. */
+function environment(c){
+  var aq=fetch(AQ+'?latitude='+c.lat+'&longitude='+c.lon+'&current=us_aqi,pm2_5,ozone&timezone=America%2FLos_Angeles')
+    .then(function(r){return r.json();}).catch(function(){return null;});
+  var wx=fetch(WX+'?latitude='+c.lat+'&longitude='+c.lon+'&daily=temperature_2m_max,uv_index_max&temperature_unit=fahrenheit&forecast_days=1&timezone=America%2FLos_Angeles')
+    .then(function(r){return r.json();}).catch(function(){return null;});
+  return Promise.all([aq,wx]).then(function(p){
+    var a=p[0], w=p[1], out={};
+    if(a&&a.current){ out.aqi=a.current.us_aqi; out.pm25=a.current.pm2_5; out.ozone=a.current.ozone; }
+    if(w&&w.daily){ out.tmax=w.daily.temperature_2m_max&&w.daily.temperature_2m_max[0];
+                    out.uv=w.daily.uv_index_max&&w.daily.uv_index_max[0]; }
+    return out;
+  });
+}
+function aqiBand(v){
+  if(v==null) return null;
+  if(v<=50) return {t:'Good', flag:false};
+  if(v<=100) return {t:'Moderate', flag:false};
+  if(v<=150) return {t:'Unhealthy for sensitive groups', flag:true};
+  if(v<=200) return {t:'Unhealthy', flag:true};
+  return {t:'Very unhealthy', flag:true};
+}
+
+/* ---------- state ---------- */
+var S = { center:null, rows:[], visible:[], selected:{}, selOrder:[], env:null, showAll:false, queryMs:0, mode:'standalone' };
+
+/* ---------- helpers ---------- */
+var fmtMi=function(m){ var v=m/MI; return v<10 ? v.toFixed(1) : String(Math.round(v)); };
+var mapsUrl=function(r){ return 'https://www.google.com/maps/dir/?api=1&destination='+r.lat.toFixed(5)+','+r.lon.toFixed(5); };
+var allTrailsUrl=function(r){ return 'https://www.alltrails.com/search?q='+encodeURIComponent(r.name); };
+var onAllTrails=function(r){ return r.kind==='trail'||r.kind==='preserve'; };
+function toast(m){ var t=el('div','toast',m); document.body.appendChild(t); setTimeout(function(){t.remove();},2400); }
+
+/* Epic's SmartPhrase editor is not a rich-text field. Curly quotes, en
+   dashes and non-breaking spaces come through as garbage, so the pasted
+   block is forced to plain ASCII and a test asserts it. */
+function ascii(s){
+  return String(s)
+    .replace(/[‘’‚‛]/g,"'")
+    .replace(/[“”„]/g,'"')
+    .replace(/[–—−]/g,'-')
+    .replace(/…/g,'...')
+    .replace(/ /g,' ')
+    .replace(/[•·]/g,'-')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g,'');
+}
+
+/* ---------- amenity labels ---------- */
+var AMEN_LABEL={toilets:'Restroom', water:'Drinking water', parking:'Parking', bench:'Benches'};
+
+/* ---------- rendering: environment strip ---------- */
+function renderEnv(){
+  var box=$('#env'); box.textContent=''; 
+  if(!S.env){ box.hidden=true; return; }
+  box.hidden=false;
+  var e=S.env, band=aqiBand(e.aqi);
+  if(e.aqi!=null){
+    var c=el('div','e'+(band.flag?' flag':''));
+    c.appendChild(el('b',null,String(Math.round(e.aqi))));
+    c.appendChild(el('span',null,'US AQI now'));
+    c.appendChild(el('em',null,band.t));
+    box.appendChild(c);
+  }
+  if(e.tmax!=null){
+    var hot=e.tmax>=95;
+    var t=el('div','e'+(hot?' flag':''));
+    t.appendChild(el('b',null,Math.round(e.tmax)+'°F'));
+    t.appendChild(el('span',null,'High today'));
+    t.appendChild(el('em',null,hot?'Advise early morning or evening':'Comfortable range'));
+    box.appendChild(t);
+  }
+  if(e.uv!=null){
+    var u=el('div','e'+(e.uv>=8?' flag':''));
+    u.appendChild(el('b',null,String(Math.round(e.uv))));
+    u.appendChild(el('span',null,'Peak UV'));
+    u.appendChild(el('em',null,e.uv>=8?'Sun protection needed':'Moderate'));
+    box.appendChild(u);
+  }
+}
+
+/* ---------- rendering: the result list ---------- */
+function renderList(){
+  var rows=S.visible, list=$('#list');
+  list.textContent='';
+  if(!S.center){ 
+    var e0=el('div','empty');
+    e0.appendChild(el('b',null,'Nothing searched yet'));
+    e0.appendChild(document.createTextNode('Enter the patient’s ZIP code on the left and press Find places.'));
+    list.appendChild(e0); return;
+  }
+  if(!rows.length){
+    var e1=el('div','empty');
+    e1.appendChild(el('b',null,'No sites matched those filters'));
+    e1.appendChild(document.createTextNode('Widen the travel distance, or relax the surface and amenity filters. Surface is recorded for only a minority of sites, so a strict filter hides real options.'));
+    list.appendChild(e1); return;
+  }
+  var cap=S.showAll?rows.length:24;
+  rows.slice(0,cap).forEach(function(r){ list.appendChild(renderRow(r)); });
+  if(rows.length>cap){
+    var b=el('button','more','Show the remaining '+(rows.length-cap)+' sites, out to '+fmtMi(rows[rows.length-1].meters)+' miles');
+    b.type='button';
+    b.addEventListener('click',function(){ S.showAll=true; renderList(); });
+    list.appendChild(b);
+  }
+}
+function renderRow(r){
+  var row=el('div','r'); row.dataset.id=r.id; row.dataset.kind=r.kind;
+  if(S.selected[r.id]) row.className='r sel';
+  var pick=el('button','pick', S.selected[r.id]?'✓':'');
+  pick.type='button';
+  pick.setAttribute('aria-label',(S.selected[r.id]?'Remove ':'Add ')+r.name+' to the summary');
+  pick.addEventListener('click',function(){ toggle(r); });
+  row.appendChild(pick);
+
+  var mid=el('div');
+  mid.appendChild(el('h3',null,r.name));
+  mid.appendChild(el('div','sub', KIND_LABEL[r.kind]+(r.operator?' · '+r.operator:'')));
+  var tags=el('div','tags');
+  tags.appendChild(el('span', r.surface.band==='unknown'?'t u':'t k', r.surface.label));
+  if(r.lengthM!=null) tags.appendChild(el('span','t k',(r.lengthM/MI).toFixed(1)+' mi mapped'));
+  if(r.gainM!=null) tags.appendChild(el('span','t k',Math.round(r.gainM*FT)+' ft climb'));
+  Object.keys(r.amen).forEach(function(k){ tags.appendChild(el('span','t',AMEN_LABEL[k])); });
+  if(r.wheelchair==='yes') tags.appendChild(el('span','t k','Wheelchair access recorded'));
+  if(r.lit==='yes') tags.appendChild(el('span','t','Lit'));
+  if(r.sac) tags.appendChild(el('span','t w','Hiking grade: '+r.sac.replace(/_/g,' ')));
+  if(r.fragments>1) tags.appendChild(el('span','t',r.fragments+' mapped segments'));
+  mid.appendChild(tags);
+  if(onAllTrails(r)){
+    var a=el('a','at','Look it up on AllTrails');
+    a.href=allTrailsUrl(r); a.target='_blank'; a.rel='noopener noreferrer';
+    mid.appendChild(a);
+  }
+  row.appendChild(mid);
+
+  var d=el('div','dist');
+  d.appendChild(el('b',null,fmtMi(r.meters)));
+  d.appendChild(el('span',null,'miles'));
+  row.appendChild(d);
+  return row;
+}
+function toggle(r){
+  if(S.selected[r.id]){
+    delete S.selected[r.id];
+    S.selOrder=S.selOrder.filter(function(x){return x!==r.id;});
+  } else {
+    if(S.selOrder.length>=4){ toast('Four sites is the most that fits on a summary'); return; }
+    S.selected[r.id]=r; S.selOrder.push(r.id);
+    enrich(r);
+  }
+  renderList(); renderOutput(); renderSheet();
+}
+function picks(){ return S.selOrder.map(function(id){return S.selected[id];}); }
+
+/* Fetch geometry -> length -> elevation for one selected site. Failures are
+   silent in the sense that the field stays null and therefore renders as
+   "not recorded" - never as a zero. */
+function isLinear(r){
+  /* Only linear features have a length worth reporting. A park mapped as a
+     polygon has a perimeter, and calling that "miles of mapped trail" would
+     be a number that is precise and wrong - the exact failure this project
+     keeps warning about. Nodes have no geometry at all. */
+  if(r.osmType==='node') return false;
+  if(r.kind==='trail'||r.kind==='paved') return true;
+  return r.osmType==='relation';
+}
+function enrich(r){
+  if(r.lengthM!=null || r._enriching) return;
+  if(!isLinear(r)){ r.enrichSkipped='not a linear feature'; return; }
+  r._enriching=true;
+  var q=geomQuery([r]);
+  if(!q){ r._enriching=false; return; }
+  overpass(q).then(function(j){
+    var e=(j.elements||[])[0]; if(!e) return null;
+    var pts=polyOf(e);
+    var L=polyLength(pts);
+    /* A named way split into many fragments would under-report if we
+       measured one fragment, so length is claimed only when this feature
+       is the whole thing: a single unfragmented way, or a route relation. */
+    if(L!=null && (r.osmType==='relation' || r.fragments<=1)) r.lengthM=L;
+    var s=samplePoints(pts,24);
+    if(s.length<2) return null;
+    return elevationGain(s);
+  }).then(function(g){
+    if(g) r.gainM=g.gain;
+    r._enriching=false;
+    renderList(); renderOutput(); renderSheet();
+  }).catch(function(){ r._enriching=false; });
+}
+
+/* ================= THE OUTPUT BLOCK ================= */
+
+var PHRASE_NAME='.WALKRX';
+
+function smartPhraseTemplate(){
+  return [
+    'OUTDOOR ACTIVITY PLAN',
+    '',
+    'We talked today about getting outside for exercise. Below are places',
+    'near you, chosen with your health in mind.',
+    '',
+    '>>> CLINICIAN: press F2 and paste the TrailScript output at the *** below <<<',
+    '',
+    '***',
+    '',
+    '-----------------------------------------------------------',
+    'Questions about whether this is safe for you? Call the clinic',
+    'before starting. Stop and seek care for chest pain, unusual',
+    'shortness of breath, or dizziness.',
+    ''
+  ].join('\n');
+}
+
+function epicHowTo(){
+  return [
+    'BUILDING THE SMARTPHRASE IN EPIC',
+    '',
+    '1.  In Epic, open the SmartPhrase Manager.',
+    '      Epic button > Tools > SmartTool Editors > My SmartPhrases',
+    '      (the exact path varies by build; SmartPhrase Manager is the target)',
+    '',
+    '2.  Click New. Name it:  WALKRX',
+    '      Users then type  .WALKRX  in any note or AVS field.',
+    '',
+    '3.  Paste the template from the "SmartPhrase template" tab into the body.',
+    '',
+    '4.  The three asterisks *** are an Epic wildcard. After the phrase is',
+    '    inserted, F2 jumps to it. That is the paste target, and it is the',
+    '    only place the clinician has to put anything.',
+    '',
+    '5.  Add the tool link as the first line so it travels with the phrase:',
+    '      ' + location.href.split('?')[0].split('#')[0],
+    '',
+    '6.  Save. Share it with the department when the content has been',
+    '    reviewed and signed off by a clinician.',
+    '',
+    'WHY A SMARTPHRASE AND NOT AN INTEGRATED APP',
+    '',
+    'A SmartPhrase is created by any end user in minutes and needs no',
+    'approval, no security review, and no build request. It is the version',
+    'of this project that can be in use next month. The SMART on FHIR app',
+    'is the same tool with the ZIP code filled in automatically from the',
+    'chart; it needs an Epic client ID and a health-system security review,',
+    'which is a longer road and the reason this fallback exists.',
+    ''
+  ].join('\n');
+}
+
+function comorbBlock(key){
+  var c=COMORB[key]; if(!c) return {lines:[], hasDraft:false};
+  var L=[], hasDraft=false;
+  if(c.quotes && c.quotes.length){
+    L.push('WHAT THE GUIDELINES SAY');
+    c.quotes.forEach(function(qid){
+      var g=G[qid]; if(!g) return;
+      L.push('  "'+g.quote+'"');
+      L.push('    -- '+g.cite);
+      L.push('');
+    });
+  }
+  if(c.draft && c.draft.length){
+    hasDraft=true;
+    L.push('POINTS TO DISCUSS -- ' + c.label.toUpperCase());
+    L.push('  *** DRAFT. NOT YET REVIEWED BY A CLINICIAN. ***');
+    L.push('  The lines below were drafted by an AI assistant for clinician');
+    L.push('  review. They are not quoted from a guideline and must be read');
+    L.push('  and approved before any patient sees them.');
+    L.push('');
+    c.draft.forEach(function(d){ L.push('  - '+d); });
+    L.push('');
+  }
+  return {lines:L, hasDraft:hasDraft};
+}
+
+function buildAvsText(){
+  var P=picks(), c=S.center, L=[];
+  var rx=$('#rx').value;
+  var key=$('#comorb').value;
+  var cb=comorbBlock(key);
+
+  L.push('PLACES TO WALK NEAR YOU');
+  L.push('');
+  if(rx){ L.push('Your plan: '+rx); L.push(''); }
+
+  P.forEach(function(r,i){
+    L.push((i+1)+'. '+r.name.toUpperCase());
+    L.push('   '+KIND_LABEL[r.kind]+', about '+fmtMi(r.meters)+' miles from '+(c.city||'you')+'.');
+    var facts=[];
+    facts.push(r.surface.band==='unknown' ? 'Surface not recorded in the map data'
+                                          : 'Surface: '+r.surface.label.toLowerCase());
+    if(r.lengthM!=null) facts.push('about '+(r.lengthM/MI).toFixed(1)+' miles of mapped trail');
+    if(r.gainM!=null) facts.push('about '+Math.round(r.gainM*FT)+' feet of climb');
+    if(r.wheelchair==='yes') facts.push('wheelchair access recorded');
+    if(r.lit==='yes') facts.push('lit after dark');
+    L.push('   '+facts.join('. ')+'.');
+    var am=Object.keys(r.amen).map(function(k){return AMEN_LABEL[k].toLowerCase();});
+    L.push('   On site: '+(am.length?am.join(', '):'nothing recorded in the map data'));
+    L.push('   Directions: '+mapsUrl(r));
+    if(onAllTrails(r)) L.push('   Photos and reviews: '+allTrailsUrl(r));
+    L.push('');
+  });
+
+  if(S.env && (S.env.aqi!=null || S.env.tmax!=null)){
+    L.push('CONDITIONS WHEN THIS WAS PRINTED');
+    var bits=[];
+    if(S.env.aqi!=null){ var b=aqiBand(S.env.aqi); bits.push('Air quality index '+Math.round(S.env.aqi)+' ('+b.t+')'); }
+    if(S.env.tmax!=null) bits.push('high of '+Math.round(S.env.tmax)+' F today');
+    if(S.env.uv!=null) bits.push('peak UV '+Math.round(S.env.uv));
+    L.push('  '+bits.join('; ')+'.');
+    if(S.env.tmax!=null && S.env.tmax>=95) L.push('  On days like this, walk early morning or after sunset.');
+    if(S.env.aqi!=null && S.env.aqi>100) L.push('  Air quality is poor today. Consider an indoor option instead.');
+    L.push('');
+  }
+
+  if(cb.lines.length){ L.push('-----------------------------------------------------------'); L.push(''); L.push.apply(L,cb.lines); }
+
+  L.push('-----------------------------------------------------------');
+  L.push('Trail and park locations from OpenStreetMap contributors (ODbL).');
+  L.push('Elevation from a public terrain model; air quality and weather from');
+  L.push('Open-Meteo. Conditions change - check before you go.');
+  L.push('Stop and seek care for chest pain, unusual shortness of breath, or');
+  L.push('dizziness.');
+  return ascii(L.join('\n'));
+}
+
+var OUT_TAB='avs';
+function renderOutput(){
+  var box=$('#out'), P=picks();
+  if(!P.length){ box.hidden=true; return; }
+  box.hidden=false;
+  var text, note;
+  if(OUT_TAB==='avs'){
+    text=buildAvsText();
+    var key=$('#comorb').value, cb=comorbBlock(key);
+    note = cb.hasDraft
+      ? 'This block contains AI-drafted clinical talking points for ' + COMORB[key].label.toLowerCase()
+        + '. They are marked as unreviewed inside the text. Read them before this reaches a patient.'
+      : 'Plain ASCII, safe to paste into Epic. ' + P.length + ' site' + (P.length>1?'s':'') + ' included.';
+  } else if(OUT_TAB==='phrase'){
+    text=ascii(smartPhraseTemplate());
+    note='Paste this into a new SmartPhrase named WALKRX. The *** is an Epic wildcard - F2 jumps to it, and that is where the output above goes.';
+  } else {
+    text=ascii(epicHowTo());
+    note='Step by step, for whoever builds the phrase.';
+  }
+  $('#outNote').textContent=note;
+  $('#pasteBox').value=text;
+}
+
+/* ---------- printable handout ---------- */
+function drawQR(canvas,text){
+  try{
+    var q=qrcode(0,'M'); q.addData(text); q.make();
+    var n=q.getModuleCount(), scale=3, pad=2, size=(n+pad*2)*scale;
+    canvas.width=size; canvas.height=size;
+    var g=canvas.getContext('2d');
+    g.fillStyle='#ffffff'; g.fillRect(0,0,size,size);
+    g.fillStyle='#16211c';
+    for(var row=0;row<n;row++) for(var col=0;col<n;col++)
+      if(q.isDark(row,col)) g.fillRect((col+pad)*scale,(row+pad)*scale,scale,scale);
+  }catch(e){ /* a blank square beats a wrong code */ }
+}
+function renderSheet(){
+  var P=picks(), sheet=$('#sheet'), paper=$('#paper');
+  $('#selCount').textContent = P.length ? P.length+' selected' : '';
+  if(!P.length){ sheet.hidden=true; return; }
+  sheet.hidden=false; paper.textContent='';
+  paper.appendChild(el('h2',null,'Places to walk near you'));
+  var c=S.center;
+  paper.appendChild(el('div','pmeta','Prepared '+new Date().toLocaleDateString()+' · near '+(c.city||'you')+(c.state?', '+c.state:'')+(c.zip?' '+c.zip:'')));
+  var rx=$('#rx').value;
+  if(rx){
+    var p=el('p','rx');
+    p.appendChild(el('strong',null,'Your plan: '));
+    p.appendChild(document.createTextNode(rx));
+    paper.appendChild(p);
+  }
+  P.forEach(function(r){
+    var box=el('div','plc'), left=el('div');
+    left.appendChild(el('h3',null,r.name));
+    left.appendChild(el('div','where', KIND_LABEL[r.kind]+' · about '+fmtMi(r.meters)+' miles from home'+(r.operator?' · '+r.operator:'')));
+    var facts=[];
+    facts.push(r.surface.band==='unknown'?'Surface not recorded':'Surface: '+r.surface.label.toLowerCase());
+    if(r.lengthM!=null) facts.push((r.lengthM/MI).toFixed(1)+' mi mapped');
+    if(r.gainM!=null) facts.push(Math.round(r.gainM*FT)+' ft of climb');
+    var am=Object.keys(r.amen).map(function(k){return AMEN_LABEL[k].toLowerCase();});
+    if(am.length) facts.push(am.join(', '));
+    left.appendChild(el('div','facts',facts.join(' · ')));
+    box.appendChild(left);
+    var right=el('div'), qr=el('canvas','qr');
+    right.appendChild(qr); drawQR(qr,mapsUrl(r));
+    box.appendChild(right);
+    paper.appendChild(box);
+  });
+  var key=$('#comorb').value, c2=COMORB[key];
+  if(c2 && c2.quotes && c2.quotes.length){
+    var care=el('div','care');
+    care.appendChild(el('b',null,'Before you start'));
+    var g=G[c2.quotes[0]];
+    if(g){ care.appendChild(document.createTextNode('"'+g.quote+'" — '+g.cite)); }
+    paper.appendChild(care);
+  }
+  var f=el('footer');
+  f.textContent='Locations from OpenStreetMap contributors (ODbL). Scan a code for driving directions. Surfaces shown only where the map data records them. Check conditions before you go, and stop if you have chest pain, unusual shortness of breath, or dizziness.';
+  paper.appendChild(f);
+}
+
+/* ---------- coverage line ---------- */
+function refresh(){
+  if(!S.rows.length) return;
+  var o=readOpts();
+  S.visible=rank(S.rows,o);
+  renderList();
+  $('#mcount').textContent = S.visible.length+' of '+S.visible.inScope+' within '+o.radiusMi+' miles'
+    + (S.queryMs?' · '+(S.queryMs/1000).toFixed(1)+'s':'');
+  var parts=[];
+  if(S.visible.inScope) parts.push(S.visible.noSurfaceData+' of '+S.visible.inScope+' sites in range have no recorded surface ('
+    +Math.round(100*S.visible.noSurfaceData/S.visible.inScope)+'%).');
+  if(S.visible.hiddenSurface) parts.push(S.visible.hiddenSurface+' hidden because the data does not confirm they are paved - that is missing data, not a paved-over answer.');
+  if(S.visible.hiddenAmen) parts.push(S.visible.hiddenAmen+' hidden by the amenity filter.');
+  $('#cover').textContent=parts.join(' ');
+}
+function readOpts(){
+  var kinds={};
+  [].forEach.call(document.querySelectorAll('#kinds .chip'),function(c){
+    if(c.getAttribute('aria-pressed')==='true') kinds[c.dataset.k]=1; });
+  var amen=[];
+  [].forEach.call(document.querySelectorAll('#amen .chip'),function(c){
+    if(c.getAttribute('aria-pressed')==='true') amen.push(c.dataset.a); });
+  return { kinds:kinds, amen:amen, surface:$('#surf').value, radiusMi:+$('#radius').value,
+           maxGainM:+$('#maxgain').value, maxLenMi:+$('#maxlen').value };
+}
+
+/* ---------- comorbidity presets ---------- */
+function applyPreset(){
+  var key=$('#comorb').value, c=COMORB[key];
+  var note=$('#comorbNote');
+  if(!c){ return; }
+  var p=c.preset;
+  $('#maxgain').value=p.maxgain; $('#maxlen').value=p.maxlen;
+  $('#surf').value=p.surf; $('#radius').value=p.radius;
+  [].forEach.call(document.querySelectorAll('#amen .chip'),function(ch){
+    ch.setAttribute('aria-pressed', p.amen.indexOf(ch.dataset.a)>=0 ? 'true':'false'); });
+  note.textContent = key==='none'
+    ? 'No filters pre-set. Every control below is yours.'
+    : 'Filters pre-set for '+c.label.toLowerCase()+'. Override any of them - these are a starting point, not a recommendation.';
+  if(S.rows.length) refresh();
+  renderOutput(); renderSheet();
+}
+
+/* ---------- search ---------- */
+function setCenter(c){
+  S.center=c;
+  $('#zipEcho').textContent = c.src==='zip'
+    ? 'Using the centre of ZIP '+c.zip+' ('+c.city+', '+c.state+'). Large rural ZIPs can put this a few miles off; use a landmark to tighten it.'
+    : '';
+}
+function findLandmark(){
+  var q=($('#landmark').value||'').trim();
+  if(q.length<3){ $('#lmEcho').textContent='Type at least three characters.'; return; }
+  $('#lmEcho').textContent='Looking it up...';
+  fetch(NOMINATIM+'?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=us')
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j || !j.length){ $('#lmEcho').textContent='No match. Try a business, school, park or hospital name plus the city.'; return; }
+      var h=j[0], lat=parseFloat(h.lat), lon=parseFloat(h.lon);
+      var prev=S.center, off=prev?haversine(prev,{lat:lat,lon:lon}):null;
+      setCenter({lat:lat, lon:lon, city:(h.display_name||'').split(',')[0], state:prev?prev.state:'', zip:prev?prev.zip:'', src:'landmark'});
+      $('#lmEcho').textContent='Centred on '+(h.display_name||'').split(',').slice(0,2).join(',')
+        + (off!=null ? ' - '+fmtMi(off)+' miles from the ZIP centre.' : '');
+      search(true);
+    })
+    .catch(function(){ $('#lmEcho').textContent='The geocoder did not answer. The ZIP code still works.'; });
+}
+
+function search(keepCenter){
+  var errBox=$('#err'); errBox.hidden=true;
+  if(!keepCenter){
+    var zip=($('#zip').value||'').trim();
+    var c=lookupZip(zip);
+    if(!c){
+      errBox.textContent = zip ? 'ZIP '+zip+' is not in the US ZIP table (42,555 entries). Check the digits.'
+                               : 'Enter a 5-digit US ZIP code.';
+      errBox.hidden=false; return;
+    }
+    setCenter(c);
+  }
+  if(!S.center) return;
+  S.selected={}; S.selOrder=[]; S.showAll=false;
+  var o=readOpts(), btn=$('#search');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>Searching';
+  $('#mtitle').textContent='Near '+(S.center.city||'the selected point')+(S.center.state?', '+S.center.state:'');
+  $('#mcount').textContent='';
+  var t0=Date.now();
+  var radiusM=o.radiusMi*MI;
+
+  Promise.all([
+    overpass(placesQuery(S.center,radiusM)),
+    overpass(amenityQuery(S.center,Math.min(radiusM,20000))).catch(function(){return {elements:[]};}),
+    environment(S.center).catch(function(){return null;})
+  ]).then(function(res){
+    S.queryMs=Date.now()-t0;
+    var rows=shape(res[0].elements||[], S.center);
+    attachAmenities(rows, res[1].elements||[]);
+    S.rows=rows; S.env=res[2];
+    $('#prov').textContent='Sites from OpenStreetMap contributors via the Overpass API, queried live at '
+      + new Date().toLocaleTimeString()+' (ODbL). '+(res[0].elements||[]).length+' raw features grouped into '
+      + rows.length+' named sites; '+((res[1].elements||[]).length)+' amenities matched to them. '
+      + rows.droppedAsInfrastructure+' named ways were dropped as street sidewalks or unnamed infrastructure rather than places to walk.';
+    renderEnv(); refresh(); renderOutput(); renderSheet();
+  }).catch(function(e){
+    errBox.textContent='Could not complete the search: '+e.message+'. The map service is a free community endpoint and does rate-limit; wait a few seconds and try again.';
+    errBox.hidden=false;
+  }).then(function(){
+    btn.disabled=false; btn.textContent='Find places';
+  });
+}
+
+/* ---------- wiring ---------- */
+function chipGroup(sel){
+  $(sel).addEventListener('click',function(e){
+    var b=e.target.closest('.chip'); if(!b) return;
+    b.setAttribute('aria-pressed', b.getAttribute('aria-pressed')==='true'?'false':'true');
+    refresh();
+  });
+}
+chipGroup('#kinds'); chipGroup('#amen');
+
+$('#search').addEventListener('click',function(){ search(false); });
+$('#zip').addEventListener('keydown',function(e){ if(e.key==='Enter') search(false); });
+$('#landmark').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); findLandmark(); }});
+$('#findLandmark').addEventListener('click',findLandmark);
+$('#comorb').addEventListener('change',applyPreset);
+$('#surf').addEventListener('change',refresh);
+$('#maxgain').addEventListener('change',refresh);
+$('#maxlen').addEventListener('change',refresh);
+$('#radius').addEventListener('change',function(){ if(S.center) search(true); });
+$('#rx').addEventListener('change',function(){ renderOutput(); renderSheet(); });
+$('#print').addEventListener('click',function(){ window.print(); });
+
+$('#outTabs').addEventListener('click',function(e){
+  var b=e.target.closest('.tab'); if(!b) return;
+  OUT_TAB=b.dataset.t;
+  [].forEach.call(document.querySelectorAll('#outTabs .tab'),function(t){
+    t.setAttribute('aria-selected', String(t===b)); });
+  renderOutput();
+});
+function copyText(t,msg){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){ toast(msg); },function(){ fallback(); });
+  } else fallback();
+  function fallback(){ var b=$('#pasteBox'); b.select(); toast('Press Ctrl+C / Cmd+C to copy'); }
+}
+$('#copyOut').addEventListener('click',function(){
+  if(!picks().length){ toast('Pick at least one site first'); return; }
+  copyText(buildAvsText(),'Copied. Paste at the *** in the SmartPhrase.');
+});
+$('#copyPhrase').addEventListener('click',function(){
+  copyText(ascii(smartPhraseTemplate()),'SmartPhrase template copied.');
+});
+
+/* ---------- SMART on FHIR ----------
+   Same file serves both deliverables. When launched by an EHR the ZIP is
+   read from the patient record and the search runs itself; otherwise the
+   clinician types it. Nothing else differs, which is the point: one
+   codebase, two front doors. */
+function setMode(who,meta,live){
+  S.mode = live ? 'smart' : 'standalone';
+  $('#ctxWho').textContent=who;
+  $('#ctxMeta').textContent=meta;
+  $('#ctx').className = live ? 'ctx' : 'ctx off';
+}
+(function initSmart(){
+  if(!window.FHIR || !sessionStorage.getItem('SMART_KEY')) return;
+  FHIR.oauth2.ready().then(function(client){
+    return client.patient.read();
+  }).then(function(p){
+    var nm=(p.name&&p.name[0]) ? [(p.name[0].given||[]).join(' '), p.name[0].family].filter(Boolean).join(' ') : ('Patient '+p.id);
+    var addr=(p.address||[]).filter(function(a){return a.postalCode;})[0]||{};
+    var zip=(addr.postalCode||'').slice(0,5);
+    var age=p.birthDate ? Math.floor((Date.now()-new Date(p.birthDate))/31557600000)+' y' : '';
+    setMode(nm,[age,p.gender,zip?('ZIP '+zip):'no address on file'].filter(Boolean).join(' · '),true);
+    if(zip){
+      $('#zip').value=zip;
+      if(window.ZIPS[zip]) search(false);
+    }
+  }).catch(function(e){
+    setMode('EHR launch did not complete', String(e&&e.message||e), false);
+  });
+})();
+
+applyPreset();
+renderList();
+
+/* exposed for the automated test harness only */
+window.__TS={ G:G, COMORB:COMORB, ascii:ascii, buildAvsText:buildAvsText,
+  smartPhraseTemplate:smartPhraseTemplate, epicHowTo:epicHowTo, state:S,
+  haversine:haversine, rank:rank, shape:shape, classify:classify, surfaceBand:surfaceBand,
+  polyLength:polyLength, samplePoints:samplePoints, comorbBlock:comorbBlock, isLinear:isLinear, looksLikeDestination:looksLikeDestination };
+
+})();
+</script>
+</body>
+</html>
