@@ -411,7 +411,7 @@ var COMORB = {
     draft:[] },
 
   cad: { label:"Coronary artery disease / post-MI",
-    preset:{maxgain:"90", maxlen:"2", surf:"prefer", radius:"10", amen:["parking","bench"]},
+    preset:{maxgain:"90", maxlen:"2", surf:"prefer", radius:"10", amen:["bench"]},
     quotes:["pag2018_chronic","accaha2019_pa"],
     draft:[
       "Confirm this patient has been cleared for unsupervised exercise, and consider cardiac rehabilitation referral if that has not already happened.",
@@ -422,7 +422,7 @@ var COMORB = {
     ] },
 
   hf: { label:"Heart failure",
-    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["parking","bench","toilets"]},
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["bench"]},
     quotes:["pag2018_chronic","pag2018_movemore"],
     draft:[
       "Confirm the patient is euvolaemic and clinically stable before recommending a new outdoor routine.",
@@ -432,7 +432,7 @@ var COMORB = {
     ] },
 
   t2dm: { label:"Type 2 diabetes",
-    preset:{maxgain:"9999", maxlen:"2", surf:"prefer", radius:"10", amen:["toilets","water"]},
+    preset:{maxgain:"9999", maxlen:"2", surf:"prefer", radius:"10", amen:["water"]},
     quotes:["ada2026_dpp150","ada2026_dpp44","ada2026_strength75"],
     draft:[
       "Check feet before and after walking, and make sure footwear fits - especially where there is any peripheral neuropathy.",
@@ -442,7 +442,7 @@ var COMORB = {
     ] },
 
   obesity: { label:"Obesity",
-    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["parking","bench"]},
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["bench"]},
     quotes:["ada2026_dpp150","pag2018_movemore"],
     draft:[
       "Frame the first target as showing up, not as distance. Short and repeatable beats ambitious and abandoned.",
@@ -451,7 +451,7 @@ var COMORB = {
     ] },
 
   oa: { label:"Knee or hip osteoarthritis",
-    preset:{maxgain:"30", maxlen:"1", surf:"strict", radius:"10", amen:["parking","bench"]},
+    preset:{maxgain:"30", maxlen:"1", surf:"strict", radius:"10", amen:["bench"]},
     quotes:["pag2018_chronic"],
     draft:[
       "Even, level surfaces matter more than distance here - the filter was set to confirmed-paved for that reason, which does narrow the list.",
@@ -461,7 +461,7 @@ var COMORB = {
     ] },
 
   copd: { label:"COPD or asthma",
-    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["parking","bench"]},
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"10", amen:["bench"]},
     quotes:["pag2018_chronic","pag2018_movemore"],
     draft:[
       "Check the air quality panel above before recommending a specific day - the Inland Empire regularly exceeds levels that matter for this patient.",
@@ -471,7 +471,7 @@ var COMORB = {
     ] },
 
   pad: { label:"Peripheral arterial disease",
-    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["bench","parking"]},
+    preset:{maxgain:"30", maxlen:"1", surf:"prefer", radius:"5", amen:["bench"]},
     quotes:["pag2018_chronic"],
     draft:[
       "Supervised exercise therapy is the better-supported option where it is available - consider referral before recommending walking alone.",
@@ -481,7 +481,7 @@ var COMORB = {
     ] },
 
   decond: { label:"Deconditioned / just starting out",
-    preset:{maxgain:"30", maxlen:"0.5", surf:"prefer", radius:"5", amen:["parking","bench"]},
+    preset:{maxgain:"30", maxlen:"0.5", surf:"prefer", radius:"5", amen:[]},
     quotes:["pag2018_movemore","pag2018_older"],
     draft:[
       "The first goal is a habit, not a distance. Ten minutes counts.",
@@ -490,7 +490,7 @@ var COMORB = {
     ] },
 
   mobility: { label:"Uses a wheelchair or walker",
-    preset:{maxgain:"30", maxlen:"9999", surf:"strict", radius:"10", amen:["parking","toilets"]},
+    preset:{maxgain:"30", maxlen:"9999", surf:"strict", radius:"10", amen:["parking"]},
     quotes:["pag2018_chronic"],
     draft:[
       "Surface and grade decide whether a site is usable, and the map data records surface for only a minority of places - so call ahead or check a satellite view before the patient makes a trip.",
@@ -681,9 +681,14 @@ function rank(rows,opts){
   var inScope=rows.filter(function(r){
     return r.meters<=maxM && opts.kinds[r.kind] && r.access!=='private' && r.access!=='no';
   });
+  /* The site list renders before the amenity lookup returns. Applying an
+     amenity filter in that window would hide almost everything and then
+     silently un-hide it, which reads as a broken tool. So the filter waits
+     for its data. */
+  var amenReady = opts.amenLoaded;
   var kept=inScope.filter(function(r){
     if(opts.surface==='strict' && r.surface.band!=='paved') return false;
-    for(var k=0;k<opts.amen.length;k++){ if(!r.amen[opts.amen[k]]) return false; }
+    if(amenReady) for(var k=0;k<opts.amen.length;k++){ if(!r.amen[opts.amen[k]]) return false; }
     return true;
   });
   var dest=function(k){ return (k==='park'||k==='preserve')?0:1; };
@@ -695,6 +700,7 @@ function rank(rows,opts){
   });
   out.inScope=inScope.length;
   out.hiddenSurface = opts.surface==='strict' ? inScope.filter(function(r){return r.surface.band!=='paved';}).length : 0;
+  out.amenPending = (!amenReady && opts.amen.length>0);
   out.hiddenAmen = inScope.length - kept.length - out.hiddenSurface;
   if(out.hiddenAmen<0) out.hiddenAmen=0;
   out.noSurfaceData = inScope.filter(function(r){return r.surface.band==='unknown';}).length;
@@ -812,6 +818,7 @@ function useFallback(errBox, err){
   if(away > F.radiusKm + 25) return false;   /* out of the captured region: say so honestly */
   S.rows=fallbackRows(S.center);
   S.usingFallback=true;
+  S.amenLoaded=true;   /* the offline copy ships with amenity counts already attached */
   S.fallbackReason = err ? err.message : 'requested';
   $('#prov').textContent='OFFLINE COPY IN USE. The live map service did not answer ('
     + (err?err.message:'requested for rehearsal') + '), so this list comes from a copy of the region captured on '
@@ -823,7 +830,7 @@ function useFallback(errBox, err){
 }
 
 /* ---------- state ---------- */
-var S = { center:null, rows:[], visible:[], selected:{}, selOrder:[], env:null, showAll:false, queryMs:0, mode:'standalone', usingFallback:false, fallbackReason:null };
+var S = { center:null, rows:[], visible:[], selected:{}, selOrder:[], env:null, showAll:false, queryMs:0, mode:'standalone', usingFallback:false, fallbackReason:null, amenLoaded:false };
 
 /* ---------- helpers ---------- */
 var fmtMi=function(m){ var v=m/MI; return v<10 ? v.toFixed(1) : String(Math.round(v)); };
@@ -1222,7 +1229,9 @@ function refresh(){
   if(S.visible.inScope) parts.push(S.visible.noSurfaceData+' of '+S.visible.inScope+' sites in range have no recorded surface ('
     +Math.round(100*S.visible.noSurfaceData/S.visible.inScope)+'%).');
   if(S.visible.hiddenSurface) parts.push(S.visible.hiddenSurface+' hidden because the data does not confirm they are paved - that is missing data, not a paved-over answer.');
-  if(S.visible.hiddenAmen) parts.push(S.visible.hiddenAmen+' hidden by the amenity filter.');
+  if(S.visible.amenPending) parts.push('The amenity filter is waiting on the restroom, water, parking and bench lookup and is not being applied yet.');
+  if(S.visible.hiddenAmen) parts.push(S.visible.hiddenAmen+' hidden by the amenity filter'
+    + (S.visible.length<6 ? ' - untick an amenity above to bring them back.' : '.'));
   $('#cover').textContent=parts.join(' ');
 }
 function readOpts(){
@@ -1233,7 +1242,7 @@ function readOpts(){
   [].forEach.call(document.querySelectorAll('#amen .chip'),function(c){
     if(c.getAttribute('aria-pressed')==='true') amen.push(c.dataset.a); });
   return { kinds:kinds, amen:amen, surface:$('#surf').value, radiusMi:+$('#radius').value,
-           maxGainM:+$('#maxgain').value, maxLenMi:+$('#maxlen').value };
+           maxGainM:+$('#maxgain').value, maxLenMi:+$('#maxlen').value, amenLoaded:S.amenLoaded };
 }
 
 /* ---------- comorbidity presets ---------- */
@@ -1291,7 +1300,7 @@ function search(keepCenter){
     setCenter(c);
   }
   if(!S.center) return;
-  S.selected={}; S.selOrder=[]; S.showAll=false;
+  S.selected={}; S.selOrder=[]; S.showAll=false; S.amenLoaded=false;
   var o=readOpts(), btn=$('#search');
   btn.disabled=true; btn.innerHTML='<span class="spin"></span>Searching';
   $('#mtitle').textContent='Near '+(S.center.city||'the selected point')+(S.center.state?', '+S.center.state:'');
@@ -1327,7 +1336,7 @@ function search(keepCenter){
     btn.disabled=false; btn.textContent='Find places';
     /* amenities are an enrichment, not a blocker */
     return overpass(amenityQuery(S.center,Math.min(radiusM,20000))).then(function(a){
-      attachAmenities(S.rows, a.elements||[]);
+      attachAmenities(S.rows, a.elements||[]); S.amenLoaded=true;
       $('#prov').textContent += ' ' + ((a.elements||[]).length) + ' amenities matched to sites within 400 m.';
       refresh(); renderOutput(); renderSheet();
     }).catch(function(){
