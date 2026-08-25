@@ -5,8 +5,53 @@ and puts it on the After Visit Summary.
 
 Built for Loma Linda University School of Medicine, Advanced Integration Week 2026 (Lifestyle category).
 
-**Live tool:** open `index.html`
-**EHR launch:** open `launch.html`
+---
+
+## Download it — start here
+
+**If you want to try the tool, this is the whole section you need.**
+
+### The easiest way: one file, nothing else
+
+Go to the [**Releases**](../../releases) page and download **`TrailScript-standalone.html`**.
+
+Double-click it. That's it. Everything is inside that one file - the 42,555 US ZIP codes, the offline
+site copy, the QR code generator. It works with no install, no server, and no other files beside it.
+
+### The bundles
+
+Also on the [Releases](../../releases) page, each a single zip you unzip and open:
+
+| Download | What it is | Open which file |
+|---|---|---|
+| `TrailScript-v1.0-clinician-tool.zip` | The everyday tool. What a clinician uses. | `index.html` |
+| `TrailScript-v1.0-epic-smart-app.zip` | The version that launches inside an EHR. For whoever registers the app. | `launch.html` |
+
+### If you want the whole repository
+
+Green **`Code`** button at the top of this page → **`Download ZIP`**. That gets you every file here.
+
+### One thing that will not work
+
+**Do not** open a single file's page and press **`Download raw file`** on `index.html` by itself.
+`index.html` loads four separate script files that sit beside it, and downloading it alone leaves it
+without any of them. It will open, look normal, and then reject every ZIP code you type with a message
+claiming the ZIP table has 42,555 entries - while the table is in fact empty.
+
+That is a real defect and it is being fixed. Until then: use `TrailScript-standalone.html` or a zip.
+
+---
+
+## Known issue: live data can be blocked on some networks
+
+The tool queries OpenStreetMap live through the public Overpass API. On some networks - university and
+hospital networks in particular - the default endpoint `overpass-api.de` is unreachable, and the tool
+silently falls back to a bundled offline copy of the region. It says so on screen and in the printed
+text, but the message reads like a temporary outage rather than a network block.
+
+If every search shows "OFFLINE COPY IN USE", the live endpoint is not reachable from where you are.
+Measured 25 Aug 2026: `overpass.openstreetmap.fr` answered the same query in 2.0 s from a network where
+`overpass-api.de` failed six times out of six. A multi-endpoint failover is the fix and is not yet shipped.
 
 ---
 
