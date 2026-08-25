@@ -765,7 +765,10 @@ button.ghost[aria-pressed=true]{background:var(--acc);color:#fff;border-color:va
 .bar .spacer{flex:1}
 
 /* ---------- output ---------- */
-.out{position:fixed;inset:0;z-index:900;background:var(--bg);display:none;flex-direction:column}
+/* Leaflet puts its zoom control and attribution at z-index 1000+, so a panel
+   at 900 lets them bleed through on top of the output. Caught by rendering the
+   page and looking at it, not by any assertion. */
+.out{position:fixed;inset:0;z-index:2000;background:var(--bg);display:none;flex-direction:column}
 .out.on{display:flex}
 .out header{border-bottom:1px solid var(--line)}
 .panes{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:0}
