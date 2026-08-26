@@ -3706,7 +3706,7 @@ function buildAvs(){
       L2.push((i+1)+'. '+r.name.toUpperCase()+'  (a marked route)');
       wrap(L2, snippetLine1(r).replace(/^A marked route · /,'').replace(/^A marked route$/,'No details published for this route')+'.','   ');
       var s2=snippetLine2(r); if(s2) wrap(L2, s2, '   ');
-      var ru=r.url||(r.slug?AT_BASE+r.slug:'');
+      var ru=routeLink(r);
       if(ru) L2.push('   Details: '+ru);
     }
     L2.push('');
@@ -3735,6 +3735,15 @@ function buildAvs(){
     L2.push('Route details from AllTrails, used with their written permission.');
   return ascii(L2.join('\n'));
 }
+/* The one link that actually resolves for this route, or nothing. Never a homepage. */
+function routeLink(r){
+  if(r.url)return r.url;
+  if(r.slug)return AT_BASE+r.slug;
+  if(r.osm)return r.osm;
+  if(r.lat!=null&&r.lon!=null)
+    return 'https://www.google.com/maps/dir/?api=1&destination='+r.lat.toFixed(5)+','+r.lon.toFixed(5);
+  return '';
+}
 function drawQR(cv,text){
   try{var q2=qrcode(0,'M');q2.addData(text);q2.make();
     var n=q2.getModuleCount(),sc=2,pad=2,size=(n+pad*2)*sc;
@@ -3757,13 +3766,19 @@ function buildSheet(){
     var x2=snippetLine2(r);
     if(x2){var xs=el('span',null,x2);xs.style.display='block';xs.style.marginTop='4px';t.appendChild(xs);}
     row.appendChild(t);
-    var qr=el('div','qr'),cv=document.createElement('canvas');
-    drawQR(cv, r.src==='osm'?mapsUrl(r):(r.url||(r.slug?AT_BASE+r.slug:'https://www.alltrails.com')));
-    qr.appendChild(cv);
-    var cap=el('div','cap');
-    cap.appendChild(el('b',null, r.src==='osm'?'Driving directions':'Trail details and photos'));
-    cap.appendChild(document.createTextNode('Open your phone camera and point it at this square.'));
-    qr.appendChild(cap);row.appendChild(qr);s.appendChild(row);
+    var link = r.src==='osm' ? mapsUrl(r) : routeLink(r);
+    if(link){
+      var qr=el('div','qr'),cv=document.createElement('canvas');
+      drawQR(cv,link);
+      qr.appendChild(cv);
+      var cap=el('div','cap');
+      cap.appendChild(el('b',null, r.src==='osm' ? 'Driving directions'
+        : (r.url ? 'Trail details and photos'
+                 : (r.osm ? 'Where this trail is' : 'Driving directions'))));
+      cap.appendChild(document.createTextNode('Open your phone camera and point it at this square.'));
+      qr.appendChild(cap);row.appendChild(qr);
+    }
+    s.appendChild(row);
   });
   var bd=bestDays();
   if(bd.length){
@@ -4476,7 +4491,7 @@ pins=function(){
 })();
 
 /* ---------- the prescription, back from v1 ---------- */
-var RX={min:20,days:3,on:true};
+var RX={min:15,days:5,on:true};
 function rxWeekly(){return RX.min*RX.days;}
 function rxLine(){
   if(!RX.on)return '';
@@ -4808,7 +4823,8 @@ window.TS={
   groupWays:function(w){return groupWays(w);},
   wayLen:function(g){return wayLen(g);},
   setAt:function(a){S.at=a;counts();},
-  parseDistanceTag:function(t){return parseDistanceTag(t);}
+  parseDistanceTag:function(t){return parseDistanceTag(t);},
+  routeLink:function(r){return routeLink(r);}
 };
 try{renderRx();}catch(e){}
 
