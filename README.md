@@ -145,3 +145,7 @@ quoted or drafted zones.
 
 Designed and built with Claude Opus 5 (Anthropic) as coding and drafting tool, under faculty
 approval, August 2026. All clinical content requires clinician review before patient use.
+
+## v4.0 (current)
+
+Live: https://tanyepitas07.github.io/trailscript/v4/ — adds evidence-graded prescribing indications, and fixes the AllTrails route chips that resolved to the AllTrails homepage. v1, v2, v2.2 and v3 are unchanged and still live.
