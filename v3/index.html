@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TrailScript v3.2 — two sources, one summary</title>
+<title>TrailScript v3.3 &mdash; routes for any ZIP</title>
 <style>/* required styles */
 
 .leaflet-pane,
@@ -930,7 +930,7 @@ button.mini.done{background:var(--acc);border-color:var(--acc);color:#fff}
 <body>
 
 <header>
-  <div class="brand">TrailScript <i>v3.2 · two sources</i></div>
+  <div class="brand">TrailScript <i>v3.3 · live map data</i></div>
   <input type="text" id="zip" value="92354" maxlength="5" aria-label="ZIP code">
   <button id="go">Find places</button>
   <div class="pill" id="pill"><span class="dot"></span><span id="pilltext">Not searched</span></div>
@@ -4359,6 +4359,17 @@ function snippetLine2(r){
     return out.join(' ');
   }
   if(r.park)out.push('In '+r.park.replace(/,\s*California$/,'')+'.');
+  if(r.lengthMi!=null&&r.lenSource==='computed')
+    out.push('The '+r.lengthMi+' miles is measured from the mapped trail itself, not quoted from a listing.');
+  else if(r.lenSource==='none')
+    out.push('The map data does not record how long this one is — worth checking before you go.');
+  if(r.surface)out.push(HARD.test(r.surface)
+    ? ('Hard, even surface ('+r.surface.replace(/_/g,' ')+').')
+    : ('Surface is '+r.surface.replace(/_/g,' ')+'.'));
+  else if(r.lenSource)out.push('The map data does not record the surface here.');
+  if(r.wheelchair==='yes')out.push('Recorded as wheelchair accessible.');
+  if(hasF(r,'lit'))out.push('Lit after dark.');
+  if(r.minutes!=null)out.push('About '+r.est+' at an easy 2.6 miles an hour.');
   if(r.routeType==='Loop')out.push('It loops, so you finish where you parked.');
   else if(r.routeType&&/out/i.test(r.routeType))out.push('Out and back — turn round whenever you have had enough.');
   if(r.gainFt!=null)out.push(r.gainFt+' feet of climbing overall.');
@@ -4512,6 +4523,250 @@ function renderRx(){
 }
 
 
+
+/* =========================================================================
+   v3.3 — ROUTES FOR ANY ZIP, from the map data itself
+
+   His correction, and it was right: pre-built route sets for two ZIPs are a
+   demo prop. A clinician seeing patients from a dozen ZIP codes gets one
+   working one and eleven dead ends, and the page looks confident about it.
+
+   OpenStreetMap already carries what is needed and the app was already asking
+   for it - `relation[route=hiking|foot]` and named `highway=path|footway|track`
+   were coming back in the PLACES query and being flattened into single points.
+   This reads them as routes, groups the ways that make up one trail, and
+   COMPUTES the length from the geometry instead of quoting a published number.
+
+   No key, no CORS proxy, no scraping, every ZIP in the country and outside it.
+   What it does not have: photos, star ratings, review counts. Those were never
+   ours to publish anyway.
+   ========================================================================= */
+
+function qRoutes(c,R){R=Math.round(R);
+  return '[out:json][timeout:30];\n'
+   +'way["highway"~"^(path|footway|track|bridleway)$"]["name"](around:'+R+','+c.lat+','+c.lon+')->.w;\n'
+   +'relation["route"~"^(hiking|foot|walking)$"]["name"](around:'+R+','+c.lat+','+c.lon+')->.r;\n'
+   +'.w out tags geom 500;\n'
+   +'.r out tags center 200;';}
+
+function chainBody(body,onTry){
+  var i=0;
+  function next(){
+    if(i>=ENDPOINTS.length)return Promise.reject(new Error('all failed'));
+    var ep=ENDPOINTS[i++];if(onTry)onTry(ep.name,i,ENDPOINTS.length);
+    return once(ep,body).then(function(r){return {json:r.json,source:ep.name,ms:r.ms};},
+                              function(){return next();});
+  }
+  return next();
+}
+
+function wayLen(g){
+  if(!g||g.length<2)return 0;
+  var m=0,i;
+  for(i=1;i<g.length;i++)m+=haversine({lat:g[i-1].lat,lon:g[i-1].lon},{lat:g[i].lat,lon:g[i].lon});
+  return m;
+}
+function mid(g){var i=Math.floor(g.length/2);return {lat:g[i].lat,lon:g[i].lon};}
+
+/* OSM records what it records. Where a tag is absent the card says so; nothing
+   here infers a difficulty, a surface or an access level that is not written down. */
+function sacDifficulty(t){
+  var s=t['sac_scale']||'';
+  if(s==='hiking')return 'Easy';
+  if(s==='mountain_hiking')return 'Moderate';
+  if(s)return 'Hard';
+  return '';
+}
+function osmFeatures(t){
+  var f=[];
+  if(t.wheelchair==='yes')f.push('ada');
+  if(/^(asphalt|concrete|paved|paving_stones)$/.test(t.surface||''))f.push('paved');
+  if(/^(compacted|fine_gravel)$/.test(t.surface||''))f.push('partially-paved');
+  if(t.lit==='yes')f.push('lit');
+  if(t.dog==='no'||t.dogs==='no')f.push('dogs-no');
+  if(t.dog==='leashed'||t.dogs==='leashed')f.push('dogs-leash');
+  if(t.smoothness==='excellent'||t.smoothness==='good')f.push('strollers');
+  return f;
+}
+function parseDistanceTag(t){
+  var d=t.distance||t.length||'';
+  var m=String(d).match(/([\d.]+)\s*(km|mi|m)?/i);
+  if(!m)return null;
+  var v=parseFloat(m[1]);if(!isFinite(v)||v<=0)return null;
+  var u=(m[2]||'km').toLowerCase();
+  if(u==='mi')return v;
+  if(u==='m')return v/1609.34;
+  return v*0.621371;
+}
+
+/* Ways carrying one trail's name are one trail - unless they are miles apart,
+   which is two different "Creek Trail"s and must not be summed into one. */
+function groupWays(ways){
+  var groups=[];
+  ways.forEach(function(w){
+    var g=w.geometry;if(!g||g.length<2)return;
+    var p=mid(g),len=wayLen(g),nm=(w.tags||{}).name;
+    var hit=null,k;
+    for(k=0;k<groups.length;k++){
+      if(groups[k].name!==nm)continue;
+      if(haversine(groups[k].pt,p)<3000){hit=groups[k];break;}
+    }
+    if(!hit){hit={name:nm,pt:p,m:0,tags:{},n:0};groups.push(hit);}
+    hit.m+=len;hit.n++;
+    Object.keys(w.tags||{}).forEach(function(t){if(hit.tags[t]===undefined)hit.tags[t]=w.tags[t];});
+    if(len>(hit.longest||0)){hit.longest=len;hit.pt=p;}
+  });
+  return groups;
+}
+
+function shapeRoutes(json,c){
+  var els=(json&&json.elements)||[],ways=[],rels=[];
+  els.forEach(function(e){
+    if(e.type==='way'&&e.geometry)ways.push(e);
+    else if(e.type==='relation')rels.push(e);});
+  var out=[],seen={};
+  groupWays(ways).forEach(function(g){
+    if(g.m<300)return;                                   /* under 0.2 mi is a driveway, not a walk */
+    var t=g.tags||{},key=g.name.toLowerCase()+'@'+g.pt.lat.toFixed(2);
+    if(seen[key])return;seen[key]=1;
+    out.push({src:'at',name:g.name,url:'',slug:'',
+      difficulty:sacDifficulty(t),lengthMi:Math.round((g.m/1609.34)*10)/10,
+      minutes:Math.round((g.m/1609.34)/2.6*60),      /* 2.6 mph, the figure stated on the card */
+      gainFt:null,routeType:'',park:t.operator||t.network||'',
+      rating:null,reviews:null,features:osmFeatures(t),
+      lat:g.pt.lat,lon:g.pt.lon,segs:g.n,
+      driveMi:Math.round((haversine(c,g.pt)/1609.34)*100)/100,
+      surface:t.surface||null,wheelchair:t.wheelchair||null,
+      osm:'https://www.openstreetmap.org/?mlat='+g.pt.lat.toFixed(5)+'&mlon='+g.pt.lon.toFixed(5)+'#map=15/'+g.pt.lat.toFixed(4)+'/'+g.pt.lon.toFixed(4),
+      lenSource:'computed'});
+  });
+  rels.forEach(function(r){
+    var t=r.tags||{},ct=r.center;if(!t.name||!ct)return;
+    var key=t.name.toLowerCase()+'@'+ct.lat.toFixed(2);
+    if(seen[key])return;seen[key]=1;
+    var miL=parseDistanceTag(t);
+    out.push({src:'at',name:t.name,url:'',slug:'',
+      difficulty:sacDifficulty(t),lengthMi:(miL==null?null:Math.round(miL*10)/10),
+      minutes:(miL==null?null:Math.round(miL/2.6*60)),
+      gainFt:null,routeType:(t.roundtrip==='yes'?'Loop':''),park:t.operator||t.network||'',
+      rating:null,reviews:null,features:osmFeatures(t),
+      lat:ct.lat,lon:ct.lon,segs:null,
+      driveMi:Math.round((haversine(c,{lat:ct.lat,lon:ct.lon})/1609.34)*100)/100,
+      surface:t.surface||null,wheelchair:t.wheelchair||null,
+      osm:'https://www.openstreetmap.org/relation/'+r.id,
+      lenSource:(miL==null?'none':'tagged')});
+  });
+  out.sort(function(a,b){return a.driveMi-b.driveMi;});
+  out.forEach(function(r,i){r.id='a'+i;r.est=estFrom(r.minutes);});
+  return out;
+}
+
+/* ---------- routes now come from the live map, for any ZIP ---------- */
+loadRoutes=function(zip){
+  V3.zipLoaded=null;V3.built=null;V3.tried=false;V3.routeMs=null;V3.routeSrc=null;
+  S.at=[];S.sel=S.sel.filter(function(id){return id.charAt(0)==='o';});
+  counts();paint();renderList();
+  if(!S.centre)return Promise.resolve();
+  var c=S.centre;
+  /* Places is the query that must not fail. Let it claim the fastest endpoint
+     first; a second simultaneous request is how you earn a 429 from both. */
+  return new Promise(function(go){setTimeout(go,900);})
+   .then(function(){return chainBody(qRoutes(c,16000),null);})
+   .then(function(res){
+    S.at=shapeRoutes(res.json,c);
+    V3.zipLoaded=zip;V3.tried=true;V3.routeSrc=res.source;V3.routeMs=res.ms;
+    V3.built='live';
+    counts();renderList();
+  }).catch(function(){
+    V3.tried=true;V3.routeSrc=null;S.at=[];counts();renderList();
+  });
+};
+
+/* the source line has to say what this is, and admit what it lacks */
+(function(){
+  var inner=renderList;
+  renderList=function(){
+    inner();
+    var sl=document.querySelector('.listwrap .srcline');
+    if(!sl||S.tab!=='at')return;
+    sl.textContent='';
+    if(V3.zipLoaded&&S.at.length){
+      sl.appendChild(el('b',null,'OpenStreetMap contributors (ODbL), read live'));
+      sl.appendChild(document.createTextNode(' from '+(V3.routeSrc||'a map server')
+        +(V3.routeMs?(' in '+(V3.routeMs/1000).toFixed(1)+'s'):'')
+        +'. Lengths are computed from the trail geometry, not quoted. Walking times assume '
+        +'2.6 mph. OSM has no photos, star ratings or review counts — where a card is '
+        +'silent, the map data is silent.'));
+    }else if(V3.tried&&V3.zipLoaded){
+      sl.appendChild(el('b',null,'OpenStreetMap has no named walking routes recorded within 10 miles of this ZIP.'));
+      sl.appendChild(document.createTextNode(' That is a gap in the map data, not an error. '
+        +'The Places tab still works, and you can paste an AllTrails page below.'));
+    }else if(V3.tried){
+      sl.appendChild(el('b',null,'No map server answered for routes.'));
+      sl.appendChild(document.createTextNode(' Press Find places again, or paste an AllTrails page below.'));
+    }else{
+      sl.textContent='Reading walking routes from the map…';
+    }
+  };
+})();
+
+/* OSM routes carry coordinates, so they belong on the map too - and the map
+   filter has to apply to them for the same reason it applies to places. */
+(function(){
+  var innerPins=pins;
+  pins=function(){
+    innerPins();
+    S.at.filter(function(r){return r.lat!=null&&passes(r);}).forEach(function(r){
+      var mk=L.marker([r.lat,r.lon],{icon:L.divIcon({className:'',iconSize:[11,11],
+        html:'<div style="width:11px;height:11px;border-radius:2px;border:2px solid #fff;'
+          +'box-shadow:0 1px 3px rgba(0,0,0,.4);background:#7a5cc4"></div>'})});
+      mk.addTo(map).bindPopup('<b>'+r.name.replace(/</g,'&lt;')+'</b><br>a marked route'
+        +(r.lengthMi!=null?(' · '+r.lengthMi+' mi'):''));
+      mk.on('click',function(){focusRow(r.id);});
+      markers[r.id]=mk;});
+  };
+})();
+
+/* focusRow assumed places; routes live on their own tab */
+(function(){
+  focusRow=function(id){
+    var want=id.charAt(0)==='a'?'at':'osm';
+    if(S.tab!==want&&S.tab!=='sel')setTab(want);
+    if(!document.querySelector('.r[data-id="'+id+'"]'))renderList();
+    setTimeout(function(){
+      var node=document.querySelector('.r[data-id="'+id+'"]');
+      if(!node)return;
+      node.scrollIntoView({behavior:'smooth',block:'center'});
+      node.classList.add('flash');
+      setTimeout(function(){node.classList.remove('flash');},1700);
+    },40);
+  };
+})();
+
+/* the card must show where a number came from, and stay silent where OSM is */
+(function(){
+  var innerCard=atCard;
+  atCard=function(r){
+    var c=innerCard(r);
+    var ch=c.querySelector('.chips');
+    if(!ch)return c;
+    if(r.lenSource==='computed')
+      ch.appendChild(el('span','chip','length computed from '+r.segs+' mapped segment'+(r.segs===1?'':'s')));
+    else if(r.lenSource==='tagged')
+      ch.appendChild(el('span','chip','length as tagged in OSM'));
+    else if(r.lenSource==='none')
+      ch.appendChild(el('span','chip miss','Length not recorded'));
+    if(r.minutes!=null)ch.appendChild(el('span','chip','time at 2.6 mph'));
+    if(!r.difficulty)ch.appendChild(el('span','chip miss','Difficulty not recorded'));
+    if(r.surface)ch.appendChild(el('span','chip','Surface: '+r.surface.replace(/_/g,' ')));
+    else ch.appendChild(el('span','chip miss','Surface not recorded'));
+    if(r.osm){var a=document.createElement('a');a.className='chip';a.href=r.osm;
+      a.target='_blank';a.rel='noopener';a.textContent='OpenStreetMap ↗';ch.appendChild(a);}
+    return c;
+  };
+})();
+
+
 /* ---------- v3: one named handle on the app, so it can be TESTED ----------
    The whole app is inside an IIFE, which is correct for a page that shares a
    window with third-party libraries - but it also meant nothing could be
@@ -4547,7 +4802,13 @@ window.TS={
   rxLine:function(){return rxLine();}, rxWeekly:function(){return rxWeekly();},
   renderRx:function(){return renderRx();},
   pins:function(){return pins();},
-  markerIds:function(){return Object.keys(markers);}
+  markerIds:function(){return Object.keys(markers);},
+  qRoutes:function(c,R){return qRoutes(c,R);},
+  shapeRoutes:function(j,c){return shapeRoutes(j,c);},
+  groupWays:function(w){return groupWays(w);},
+  wayLen:function(g){return wayLen(g);},
+  setAt:function(a){S.at=a;counts();},
+  parseDistanceTag:function(t){return parseDistanceTag(t);}
 };
 try{renderRx();}catch(e){}
 

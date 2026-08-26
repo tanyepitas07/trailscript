@@ -1,2 +1,0 @@
-{"built":"2026-08-26","source":"AllTrails connector (official MCP)","zips":["92354","94559"],
-"note":"Route sets are pre-built from the official AllTrails connector. To add a ZIP, run a Claude session with the AllTrails connector enabled and write routes/<zip>.json in the same shape."}
