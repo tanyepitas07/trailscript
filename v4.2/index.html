@@ -5334,6 +5334,69 @@ if(window.TS){
     F={drive:null,len:null,diff:'',access:false,co:false,sort:'near',wheel:false};};
 }
 
+
+/* =========================================================================
+   v4.2 — A NAMED FOOTWAY IS OFTEN A SIDEWALK, AND THE CARD NOW SAYS SO
+
+   Found by the artefact test, not by the suite: selecting the two nearest
+   routes at 92354 for a patient handout produced “Sierra Vista Drive” and
+   “Mountain View Avenue”. Measured immediately after: 44 of the 104 routes
+   at that ZIP — 42% — are named after a street, and because the list sorts
+   nearest-first they are the first thing a clinician sees.
+
+   The places tab has filtered these since S14 (112 dropped at 92354, and
+   the poster says so: “an avenue is never offered as a trail”). The routes
+   query added at v3.3 asks OSM for highway=path|footway|track, which is
+   exactly what a mapped sidewalk is tagged as, and no equivalent filter
+   was carried across.
+
+   THE FIX IS A LABEL, NOT A FILTER. A paved sidewalk two hundred metres
+   from the house is frequently the best answer for the patient this tool
+   is aimed at — hiding it would be the same mistake as the pre-built route
+   sets, in reverse. What is wrong is offering it silently, next to a named
+   trail, with nothing to tell them apart. So the card says what it is and
+   the source line reports how many there are.
+   ========================================================================= */
+var STREETY_RT=/\b(Avenue|Ave|Street|St|Drive|Dr|Road|Rd|Boulevard|Blvd|Lane|Ln|Court|Ct|Circle|Terrace|Place|Parkway|Highway|Sidewalk)\.?$/i;
+function isStreetNamed(r){return !!r && r.src==='at' && STREETY_RT.test(r.name||'');}
+function streetNamedCount(pool){return (pool||[]).filter(isStreetNamed).length;}
+
+(function(){
+  var innerCard=atCard;
+  atCard=function(r){
+    var c=innerCard(r);
+    if(!isStreetNamed(r))return c;
+    var ch=c.querySelector('.chips');
+    if(ch)ch.appendChild(el('span','chip','Named after a street — probably a sidewalk'));
+    return c;
+  };
+})();
+
+(function(){
+  var innerRL=renderList;
+  renderList=function(){
+    innerRL();
+    try{
+      var sl=document.querySelector('.listwrap .srcline');
+      if(!sl||sl.hidden||S.tab!=='at'||!S.at||!S.at.length)return;
+      var n=streetNamedCount(S.at);
+      if(!n)return;
+      sl.appendChild(document.createTextNode(' '));
+      sl.appendChild(el('b',null,n+' of '+S.at.length+' follow a named street.'));
+      sl.appendChild(document.createTextNode(
+        ' OpenStreetMap tags a mapped sidewalk the same way it tags a trail, so these are'
+        +' almost certainly pavements. They are kept, because a flat paved sidewalk close to'
+        +' home is often the right answer — and labelled on the card, so they are not mistaken'
+        +' for one.'));
+    }catch(e){}
+  };
+})();
+
+if(window.TS){
+  window.TS.isStreetNamed=function(r){return isStreetNamed(r);};
+  window.TS.streetNamedCount=function(p){return streetNamedCount(p||S.at);};
+}
+
 seedAt();ensureMap();map.setView([34.0528,-117.2513],12.4);counts();setTab('osm');search();
 
 /* =========================================================================
