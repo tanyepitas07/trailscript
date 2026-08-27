@@ -5227,11 +5227,11 @@ function wheelCoverage(pool){
       renderList();
       if(F.wheel){
         var pool=S.tab==='at'?S.at:S.osm,n=wheelCoverage(pool);
+        /* The count line below already prints the coverage numbers; repeating
+           them here put the same sentence on screen twice. Say what CHANGED. */
         say2(n.pass
-          ? (n.pass+' of '+n.rows+' record both a wheelchair tag and a hard surface'
-             +(S.tab==='at'?', easiest first.':'.'))
-          : ('None of these '+n.rows+' record both. '+n.wc+' record wheelchair access at all and '
-             +n.surf+' record a surface — this is a gap in the map, not a finding about the area.'));
+          ? ('Kept '+n.pass+' of '+n.rows+(S.tab==='at'?', easiest first.':'.'))
+          : 'Nothing here records both — the coverage line below says what the map is missing.');
       }
     });
     wrap.insertBefore(b,chips[0]?chips[0].nextSibling:anchor);
@@ -5378,8 +5378,14 @@ function ctxChip(text,kind){
   }
   c.textContent=text;
   c.title='Read-only patient context from the EHR launch. TrailScript never writes to the chart.';
-  c.style.color = kind==='live' ? '#1f6b4a' : kind==='wait' ? 'var(--dim,#98a3ab)' : '#a13226';
-  c.style.background = kind==='live' ? 'rgba(31,107,74,.12)' : 'transparent';
+  /* v4.2 fix: this was '#1f6b4a' on the dark header - about 2.5:1, and the
+     single most important thing on the screen when the app is launched from an
+     EHR. Same failure as the v4.0 .indchip bug, one session after it was logged.
+     var(--ink) is defined for both themes, so the pill reads in either. */
+  c.style.color = kind==='live' ? 'var(--ink,#e8ecef)'
+                : kind==='wait' ? 'var(--dim,#98a3ab)' : '#e0705f';
+  c.style.background = kind==='live' ? 'rgba(31,107,74,.30)' : 'transparent';
+  c.style.borderColor = kind==='live' ? '#3f8f63' : 'var(--line,#2b3833)';
   SMART.state = kind==='live' ? 'smart' : kind==='wait' ? 'connecting' : 'standalone';
 }
 
