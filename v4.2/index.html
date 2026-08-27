@@ -3945,8 +3945,10 @@ function search(){
       +S.osm.filter(function(r){return !r.surface;}).length+'</b> have no recorded surface';
      counts();renderList();pins();
    }).catch(function(){
-     pill('offline','No endpoint answered — retrying');
-     $('#meta').textContent='Every map endpoint failed. A shipped build shows its offline copy here.';
+     pill('offline','No map endpoint answered — retrying');
+     $('#meta').innerHTML='Every map endpoint failed, so <b>nothing is listed below</b>. '
+      +'That is this network, not this area \u2014 the same ZIP returns results from another connection. '
+      +'Retrying automatically every 20 seconds.';
      S.retry=setTimeout(search,20000);
    }).finally(function(){$('#go').disabled=false;});
 }
