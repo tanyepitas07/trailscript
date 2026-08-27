@@ -46,9 +46,13 @@
  * non-production client id once a UserWeb account is approved; drop it in here or
  * pass it as ?client_id= on this page URL and nothing else changes.
  */
-/* No browser storage anywhere in this project - the "no storage" claim has to
-   be true on every page, not just the main one. An Epic non-production client
-   id is supplied as a URL parameter instead, which the EHR carries through. */
+/* The Epic non-production client id is supplied as a URL parameter rather than
+   being stored, so the EHR carries it through and this page keeps no config.
+   CORRECTED v4.2: this comment used to claim "no browser storage anywhere in
+   this project". That was never true of a real launch - the SMART handshake
+   needs one sessionStorage key to carry state across the redirect, and the main
+   page keeps the map height in localStorage. The honest claim is the narrow
+   one, and it is now what the page tells the user. */
 var CLIENT_ID = new URLSearchParams(location.search).get('client_id') || 'trailscript-nonprod';
 
 var params = new URLSearchParams(location.search);
@@ -73,7 +77,7 @@ if (!iss) {
     + '</ol>'
     + '<p style="margin-top:14px">Client ID in use: <code>' + CLIENT_ID + '</code>. '
     + 'To use an Epic non-production client id, append <code>?client_id=YOUR-ID</code> to this page\'s URL '
-    + 'when registering the launch URL with the EHR. Nothing is stored in this browser.</p>');
+    + 'when registering the launch URL with the EHR. During a launch the SMART handshake keeps one session key in this tab\'s sessionStorage and discards it when the tab closes; nothing else is stored, and nothing is ever written back to the chart.</p>');
 } else {
   FHIR.oauth2.authorize({
     clientId: CLIENT_ID,

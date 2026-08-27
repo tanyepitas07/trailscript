@@ -5335,6 +5335,117 @@ if(window.TS){
 }
 
 seedAt();ensureMap();map.setView([34.0528,-117.2513],12.4);counts();setTab('osm');search();
+
+/* =========================================================================
+   v4.2 — THE SMART ON FHIR PATH, RESTORED
+
+   Found by running an actual launch, which is the only way it could have been
+   found. The SMART reference sandbox authorised, redirected to
+   /v4.2/index.html?code=…&state=…, and the app opened on its DEFAULT ZIP with
+   the authorisation code sitting unread in the address bar.
+
+   v1 read the patient and prefilled the ZIP (`index.html`, initSmart). The v2
+   rewrite dropped the FHIR client, and v2.2, v3, v3.3, v4.0 and v4.2 all
+   inherited the gap — four versions during which "a SMART on FHIR app that
+   reads the patient's ZIP from the chart" was true of a build nobody was
+   demonstrating. A launch that ends with the app open looks like success; the
+   only check that could see this was reading what the app did with the code.
+
+   LOADED ON DEMAND. This page has to keep working as one downloaded file
+   (W: "a file that needs siblings will arrive alone"), so the FHIR client is
+   fetched only when there is genuinely an EHR context to handle — a ?code= in
+   the address bar, or a SMART key left behind by launch.html. Opened from a
+   USB stick with no siblings and no EHR, nothing here runs and nothing breaks.
+
+   READ-ONLY, AND IT STAYS THAT WAY. The scope requested is patient/Patient.read.
+   The patient's name is shown to the CLINICIAN so they can see which chart is in
+   context — it is never written to the handout or the After Visit Summary text,
+   and the suite asserts that.
+   ========================================================================= */
+
+var SMART={on:false,name:null,zip:null,state:'standalone'};
+
+function ctxChip(text,kind){
+  var h=document.querySelector('header');if(!h)return;
+  var c=document.getElementById('ctxchip');
+  if(!c){
+    c=document.createElement('div');c.id='ctxchip';
+    c.style.cssText='margin-left:10px;padding:5px 11px;border-radius:999px;font-size:12px;'
+      +'font-weight:600;letter-spacing:.01em;white-space:nowrap;border:1px solid var(--line,#2b3833)';
+    var pill=document.getElementById('pill');
+    if(pill&&pill.parentNode)pill.parentNode.insertBefore(c,pill.nextSibling);
+    else h.appendChild(c);
+  }
+  c.textContent=text;
+  c.title='Read-only patient context from the EHR launch. TrailScript never writes to the chart.';
+  c.style.color = kind==='live' ? '#1f6b4a' : kind==='wait' ? 'var(--dim,#98a3ab)' : '#a13226';
+  c.style.background = kind==='live' ? 'rgba(31,107,74,.12)' : 'transparent';
+  SMART.state = kind==='live' ? 'smart' : kind==='wait' ? 'connecting' : 'standalone';
+}
+
+/* Pure enough to test: hand it a FHIR Patient resource and it does exactly what
+   a real launch does, with no network anywhere in the function. */
+function smartApply(p){
+  var out={name:null,zip:null,age:null,gender:null,applied:false,reason:''};
+  if(!p||typeof p!=='object'){out.reason='no patient resource';return out;}
+  out.name=(p.name&&p.name[0])
+    ? [(p.name[0].given||[]).join(' '),p.name[0].family].filter(Boolean).join(' ')
+    : ('Patient '+(p.id||'?'));
+  var addr=(p.address||[]).filter(function(a){return a&&a.postalCode;})[0]||{};
+  out.zip=String(addr.postalCode||'').slice(0,5);
+  out.gender=p.gender||null;
+  out.age=p.birthDate?(Math.floor((Date.now()-new Date(p.birthDate))/31557600000)+' y'):null;
+  SMART.on=true;SMART.name=out.name;SMART.zip=out.zip||null;
+  var who=[out.name,out.age,out.gender].filter(Boolean).join(' · ');
+  if(out.zip&&window.ZIPS&&window.ZIPS[out.zip]){
+    var f=document.getElementById('zip');
+    if(f){f.value=out.zip;}
+    ctxChip(who+' · ZIP '+out.zip+' from the chart','live');
+    out.applied=true;
+    try{search();}catch(e){out.reason='search failed: '+e;}
+  }else if(out.zip){
+    /* Say which of the two things went wrong. "No results" would be a lie. */
+    ctxChip(who+' · ZIP '+out.zip+' is not in the ZIP table — enter a nearby one','off');
+    out.reason='zip not in table';
+  }else{
+    ctxChip(who+' · no address on file — enter a ZIP','off');
+    out.reason='no postal code on the patient record';
+  }
+  return out;
+}
+
+(function initSmart(){
+  var qs;try{qs=new URLSearchParams(location.search);}catch(e){return;}
+  var hasCode=qs.has('code')&&qs.has('state');
+  var hasKey=false;try{hasKey=!!sessionStorage.getItem('SMART_KEY');}catch(e){}
+  if(!hasCode&&!hasKey)return;                  /* standalone: this never runs */
+
+  ctxChip('Reading the patient record…','wait');
+
+  if(window.FHIR){finish();return;}
+  var s=document.createElement('script');
+  s.src='fhir-client.min.js';
+  s.onerror=function(){
+    ctxChip('EHR launch: the FHIR client did not load — enter the ZIP by hand','off');};
+  s.onload=finish;
+  document.head.appendChild(s);
+
+  function finish(){
+    if(!window.FHIR){
+      ctxChip('EHR launch: no FHIR client on this page — enter the ZIP by hand','off');return;}
+    window.FHIR.oauth2.ready()
+      .then(function(client){return client.patient.read();})
+      .then(function(p){smartApply(p);})
+      .catch(function(e){
+        ctxChip('EHR launch did not complete: '+String(e&&e.message||e).slice(0,70),'off');});
+  }
+})();
+
+if(window.TS){
+  window.TS.SMART=function(){return SMART;};
+  window.TS.smartApply=function(p){return smartApply(p);};
+  window.TS.ctxChip=function(t,k){return ctxChip(t,k);};
+}
 })();
 </script>
 </body>
